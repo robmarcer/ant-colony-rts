@@ -11,6 +11,7 @@ import type { ColonyId, MatchEvent } from '../sim/types.js';
 import type { StrategyConfig } from '../sim/strategy.js';
 import { Renderer } from './renderer.js';
 import { APP_VERSION } from '../meta/changelog.js';
+import { changelogHtml } from './changelog-view.js';
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -30,6 +31,7 @@ const showIntel = el<HTMLInputElement>('showIntel');
 const playPause = el<HTMLButtonElement>('playPause');
 const eventLog = el<HTMLOListElement>('eventLog');
 const summary = el<HTMLDivElement>('summary');
+const docsPanel = el<HTMLElement>('docsPanel');
 
 let sim: Simulation | null = null;
 let playing = false;
@@ -314,6 +316,66 @@ function scoreFormula(): string {
   );
 }
 
+// ------------------------------------------------------------------ docs panel
+
+/**
+ * One panel, docked beside the match rather than over it.
+ *
+ * A full screen overlay was the original design and the complaint was that it
+ * covered the match. Separate tabs fixed that but cost a tab per look, and
+ * measured worse on the thing they were chosen for: a hidden tab throttles
+ * requestAnimationFrame to 1fps, so the match ran at roughly a quarter speed.
+ * Docking keeps the canvas visible and the loop in the foreground.
+ */
+function openPanel(title: string, body: string): void {
+  docsPanel.innerHTML = `<button class="close" id="closePanel" title="Escape also closes">close</button>${body}`;
+  docsPanel.scrollTop = 0;
+  docsPanel.classList.remove('hidden');
+  el<HTMLButtonElement>('closePanel').onclick = closePanel;
+}
+
+function closePanel(): void {
+  docsPanel.classList.add('hidden');
+  docsPanel.innerHTML = '';
+}
+
+async function openInstructions(): Promise<void> {
+  // Fetched, not bundled, so the panel shows exactly what the API serves.
+  let brief: string;
+  try {
+    const response = await fetch('/api/brief');
+    if (!response.ok) throw new Error(`the API responded ${response.status}`);
+    brief = await response.text();
+  } catch (error) {
+    openPanel(
+      'Instructions',
+      `<h1>Instructions for an LLM</h1><p class="provenance">Could not reach the API: ${escape(
+        error instanceof Error ? error.message : String(error),
+      )}</p>`,
+    );
+    return;
+  }
+
+  openPanel(
+    'Instructions',
+    `<h1>Instructions for an LLM</h1>
+     <p class="provenance">Paste this into the model you want writing strategies, and tell it the API is at
+       <code>${escape(location.origin)}/api</code>. Live from <code>GET /api/brief</code>.</p>
+     <p><button id="copyBrief" class="primary">Copy the brief</button> <span id="copiedNote" class="provenance"></span></p>
+     <pre id="briefText"></pre>`,
+  );
+  (el<HTMLPreElement>('briefText') as HTMLPreElement).textContent = brief;
+  el<HTMLButtonElement>('copyBrief').onclick = async () => {
+    const note = el<HTMLSpanElement>('copiedNote');
+    try {
+      await navigator.clipboard.writeText(brief);
+      note.textContent = `copied ${brief.length} characters`;
+    } catch {
+      note.textContent = 'clipboard refused, select the text below instead';
+    }
+  };
+}
+
 function escape(input: string): string {
   return input.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
@@ -321,6 +383,20 @@ function escape(input: string): string {
 // --------------------------------------------------------------------- wiring
 
 el<HTMLSpanElement>('versionNumber').textContent = `v${APP_VERSION}`;
+
+// The links stay real URLs so they can be opened in a tab deliberately or
+// bookmarked, but a plain click opens the panel instead of navigating.
+el<HTMLAnchorElement>('changelogLink').onclick = (event) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+  event.preventDefault();
+  openPanel('Changelog', changelogHtml());
+};
+
+el<HTMLAnchorElement>('instructionsLink').onclick = (event) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+  event.preventDefault();
+  void openInstructions();
+};
 
 el<HTMLButtonElement>('newMatch').onclick = () =>
   void startMatch(defASelect.value, defBSelect.value, seedInput.value || '1', Number(limitInput.value) || 600);
@@ -352,6 +428,10 @@ pastSelect.onchange = () => {
 };
 
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !docsPanel.classList.contains('hidden')) {
+    closePanel();
+    return;
+  }
   if (event.code === 'Space') {
     event.preventDefault();
     playPause.click();

@@ -39,6 +39,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.21.0',
+    timestamp: '2026-08-20T18:25:13+07:00',
+    title: 'The changelog and brief open beside the match, not in a tab',
+    precision: 'commit',
+    changes: [
+      { area: 'ui', detail: 'Both header links now open a single dismissible panel docked beside the match instead of a new tab. Closes on Escape or its button, switching between them replaces rather than stacks, and the changelog still renders from src/ui/changelog-view.ts while the brief is still fetched live from GET /api/brief, so neither gained a second copy.' },
+      { area: 'ui', detail: 'This reverses the tabs added two releases ago, and the premise printed on that link was wrong. Measured in a backgrounded tab: requestAnimationFrame is throttled to 1fps, and because the frame loop clamps elapsed time to 0.25s, the match advanced 2 sim seconds in 3 real seconds at 2x speed, roughly a quarter of the intended rate. Tabs were worse than an overlay on exactly the axis they were chosen for.', fix: true },
+      { area: 'ui', detail: 'The panel is docked, not a full screen scrim, because covering the match was the original complaint. On a viewport too narrow to sit beside the canvas it docks underneath instead: a first attempt went full width there and covered the match completely, which is the one thing it must not do.', fix: true },
+      { area: 'ui', detail: 'The header links remain real URLs, so ctrl or cmd clicking still opens a tab deliberately, and both standalone pages stay reachable for deep linking.' },
+    ],
+  },
+  {
     version: '0.20.0',
     timestamp: '2026-08-20T18:17:51+07:00',
     title: 'Ants navigate around each other',

@@ -23,10 +23,15 @@ npm start
 ```
 
 That builds the viewer and serves it and the API together on
-http://localhost:8787. Three pages: the match at `/`, the changelog at
-`/changelog.html`, and the brief to paste into a model at `/instructions.html`.
-The header links to the latter two open in their own tab, so reading them never
-disturbs a running match.
+http://localhost:8787. The header links open the changelog and the LLM brief in a
+panel docked beside the match, which keeps running. Both are also standalone
+pages at `/changelog.html` and `/instructions.html` for deep linking, and
+ctrl-clicking a header link opens one in a tab deliberately.
+
+A note on why they are a panel and not a tab: a hidden tab has its
+`requestAnimationFrame` throttled to 1fps, and because the frame loop clamps
+elapsed time, a backgrounded match measured at roughly a quarter speed. Tabs were
+worse than a panel on the exact axis they were chosen for.
 
 `npm run dev` is the development alternative: it runs the API on 8787 and a Vite
 dev server with hot reload on http://localhost:5273, proxying `/api` through.

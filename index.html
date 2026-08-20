@@ -17,10 +17,10 @@
       <span class="spacer"></span>
       <label>past <select id="pastMatch"><option value="">-</option></select></label>
       <label class="check"><input type="checkbox" id="showIntel" /> intel</label>
-      <a class="version" href="/changelog.html" target="_blank" rel="noopener" title="Opens in its own tab so the match keeps running">
+      <a id="changelogLink" class="version" href="/changelog.html" title="Opens beside the match, which keeps running">
         <span id="versionNumber">v0.0.0</span> changelog
       </a>
-      <a class="version" href="/instructions.html" target="_blank" rel="noopener" title="The brief to paste into an LLM">
+      <a id="instructionsLink" class="version" href="/instructions.html" title="The brief to paste into an LLM">
         instructions
       </a>
     </header>
@@ -55,6 +55,7 @@
     </main>
 
     <div id="summary" class="summary hidden"></div>
+    <aside id="docsPanel" class="docs-panel hidden" aria-live="polite"></aside>
     <script type="module" src="/src/ui/main.ts"></script>
   </body>
 </html>

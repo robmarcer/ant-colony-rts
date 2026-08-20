@@ -1,10 +1,21 @@
 # Changelog
 
-Current version: **0.20.0**. 20 releases, 139 recorded changes.
+Current version: **0.21.0**. 21 releases, 143 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.21.0 — The changelog and brief open beside the match, not in a tab
+
+2026-08-20 18:25 (UTC+07:00) · committed · 4 changes
+
+**Viewer**
+
+- Both header links now open a single dismissible panel docked beside the match instead of a new tab. Closes on Escape or its button, switching between them replaces rather than stacks, and the changelog still renders from src/ui/changelog-view.ts while the brief is still fetched live from GET /api/brief, so neither gained a second copy.
+- Fix: This reverses the tabs added two releases ago, and the premise printed on that link was wrong. Measured in a backgrounded tab: requestAnimationFrame is throttled to 1fps, and because the frame loop clamps elapsed time to 0.25s, the match advanced 2 sim seconds in 3 real seconds at 2x speed, roughly a quarter of the intended rate. Tabs were worse than an overlay on exactly the axis they were chosen for.
+- Fix: The panel is docked, not a full screen scrim, because covering the match was the original complaint. On a viewport too narrow to sit beside the canvas it docks underneath instead: a first attempt went full width there and covered the match completely, which is the one thing it must not do.
+- The header links remain real URLs, so ctrl or cmd clicking still opens a tab deliberately, and both standalone pages stay reachable for deep linking.
 
 ## 0.20.0 — Ants navigate around each other
 

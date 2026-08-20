@@ -124,6 +124,66 @@ canvas {
 .log li.c0 .t { color: var(--a); }
 .log li.c1 .t { color: var(--b); }
 
+/*
+ * Docked to one side rather than a full screen scrim. The match has to stay
+ * visible and ticking while this is open, which was the whole complaint that
+ * moved these pages into tabs in the first place. Tabs turned out to be worse:
+ * a hidden tab throttles requestAnimationFrame to 1fps, and the match then runs
+ * at about a quarter speed.
+ */
+.docs-panel {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: min(680px, 52vw);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 18px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+}
+.docs-panel.hidden { display: none; }
+.docs-panel h1 { font-size: 18px; margin: 4px 0 8px; }
+.docs-panel pre {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.docs-panel .close {
+  position: sticky;
+  top: 0;
+  float: right;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.docs-panel .close:hover { color: var(--a); border-color: var(--a); }
+
+/*
+ * Too narrow to sit beside the match, so sit under it instead. Going full width
+ * here covered the canvas completely, which is the one thing this panel must
+ * not do.
+ */
+@media (max-width: 900px) {
+  .docs-panel {
+    width: auto;
+    left: 8px;
+    top: auto;
+    max-height: 52vh;
+  }
+}
+
 .page { padding-bottom: 40px; }
 .reading {
   max-width: 900px;
