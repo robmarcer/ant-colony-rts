@@ -102,7 +102,7 @@ will switch behaviour on and off and achieve nothing.
 Anything the parser rejects comes back in `issues` with an exact path. Read it.
 A rule naming a metric that does not exist is silently dropped from the match.
 
-## The ten knobs, in order of how much they decide
+## The eleven knobs, in order of how much they decide
 
 1. `target_nests` (1-6). The strongest lever. Each nest is an independent build
    slot drawing on the shared food stockpile, plus 100 more units of population,
@@ -128,7 +128,10 @@ A rule naming a metric that does not exist is silently dropped from the match.
    makes the same trip and the food still needs collecting; it buys risk, on
    piles the enemy is better placed to take than you are. Pairs with
    `contest_enemy_food`.
-10. `expansion_bias`. Which way a new queen leans when choosing between sites:
+10. `scout_ratio` (0-1). Fraction of idle workers exploring rather than hauling,
+    and how much of that effort probes toward the enemy rather than sweeping for
+    food. This is how you buy information, and it is paid for in food.
+11. `expansion_bias`. Which way a new queen leans when choosing between sites:
    `toward_food`, `toward_enemy` or `toward_safety`. Measured over a match,
    mean distance from a new nest to the nearest enemy nest was 121, 143 and 160
    cells respectively. Forward nests extend how far `contest_enemy_food` and
@@ -146,8 +149,31 @@ All from your colony's point of view. Operators: `gt`, `gte`, `lt`, `lte`, `eq`.
 `units_lost_total`, `units_lost_recent`, `kills`, `enemies_near_my_nest`,
 `my_units_near_enemy_nest`.
 
-There is no fog of war, so enemy counts are exact. Food is different: a source
-only enters your memory once one of your units walks within vision of it.
+## There is fog of war, and it is the most important thing on this page
+
+Every `enemy_` metric is a **belief**, not a fact. It is built from what your own
+units have physically seen, and beliefs expire after 120 seconds. You can be
+wrong in both directions, and both happen:
+
+- Blind. At 300 seconds, a colony with `scout_ratio: 0` believed **0** enemy
+  workers when there were 47. Its `enemy_soldiers` reads 0 while an army is being
+  built, so a rule keyed on that number will never fire.
+- Stale. Late in a match a hard-scouting colony believed **381** enemy workers
+  when there were 263, because it remembers units that have since died.
+
+`enemy_intel_age_seconds` is how you tell the difference. It is seconds since you
+last laid eyes on anything of theirs. A rule that reacts to `enemy_soldiers`
+should usually check it, for example requiring
+`enemy_intel_age_seconds < 60` before trusting a count enough to commit.
+
+You always know where their **home** nest is. Everything else, including any nest
+they found later, has to be seen.
+
+Scouting has a price. At `scout_ratio: 0.6` the same definition hauled 3,596 food
+where `0.12` hauled 10,656. Information costs calories.
+
+Food works the same way and always did: a pile only enters your memory once one of
+your units walks within vision of it.
 
 ## Food is not all the same
 
@@ -227,20 +253,20 @@ Ask the ladder rather than trusting this list, since it is a snapshot:
 curl localhost:8787/api/ladder
 ```
 
-At the time of writing, over 180 comparable matches:
+At the time of writing, over 180 comparable matches under fog of war:
 
 | rating | definition | win rate |
 |---|---|---|
-| 2052 | claude-v1 | 94% (82-98%) |
-| 1783 | example-adaptive | 75% (59-86%) |
-| 1699 | example-mass-rush | 67% (50-80%) |
-| 1673 | preset-blockade | 64% (48-78%) |
-| 1673 | preset-boom | 64% (48-78%) |
-| 1515 | preset-balanced | 47% (32-63%) |
-| 1515 | preset-scout | 47% (32-63%) |
-| 1225 | preset-turtle | 22% (12-38%) |
-| 1183 | preset-rush | 19% (10-35%) |
-| 682 | preset-harass | 0% (0-10%) |
+| 2311 | claude-v1 | 100% (90-100%) |
+| 1732 | example-adaptive | 72% (56-84%) |
+| 1732 | example-mass-rush | 72% (56-84%) |
+| 1700 | preset-boom | 69% (53-82%) |
+| 1558 | preset-balanced | 56% (40-70%) |
+| 1421 | preset-blockade | 42% (27-58%) |
+| 1393 | preset-scout | 39% (25-55%) |
+| 1272 | preset-rush | 28% (16-44%) |
+| 1202 | preset-turtle | 22% (12-38%) |
+| 679 | preset-harass | 0% (0-10%) |
 
 `claude-v1` was written by a model reading this brief and the ladder, so it is
 worth reading before you start: `curl localhost:8787/api/definitions/claude-v1`.

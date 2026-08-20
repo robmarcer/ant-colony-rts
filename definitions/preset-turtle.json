@@ -17,8 +17,9 @@
     "target_nests": 1,
     "recycle_surplus": 0,
     "expansion_bias": "toward_safety",
-    "relocate_food": 0
+    "relocate_food": 0,
+    "scout_ratio": 0.08
   },
   "rules": [],
-  "updatedAt": "2026-08-20T12:20:07.562Z"
+  "updatedAt": "2026-08-20T12:33:09.780Z"
 }

@@ -207,6 +207,17 @@ export const SEPARATION_MAX_STEP = 0.35;
 /** Ticks between separation passes. Every other tick is smooth enough. */
 export const SEPARATION_INTERVAL = 2;
 
+/**
+ * Fog of war: how long a colony remembers something it has stopped seeing.
+ *
+ * Beliefs expire so that scouting keeps paying. Without expiry a single early
+ * sighting would be remembered for the rest of the match, and stale information
+ * would be indistinguishable from current information.
+ */
+export const INTEL_MEMORY_SECONDS = 120;
+/** Ticks between visibility passes. Vision does not need resolving every tick. */
+export const INTEL_INTERVAL = 3;
+
 /** Distance at which a unit is considered to have arrived at a move target. */
 export const ARRIVE_EPSILON = 0.6;
 /** Distance at which a worker can gather from a source. */

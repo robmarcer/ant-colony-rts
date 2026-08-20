@@ -67,6 +67,12 @@ export interface StrategyConfig {
    * it.
    */
   relocate_food: number;
+  /**
+   * Fraction of idle workers sent to explore rather than haul. Under fog this is
+   * how a colony buys information: everything it believes about the enemy came
+   * from a unit standing close enough to see it, and beliefs expire.
+   */
+  scout_ratio: number;
 }
 
 export const DEFAULT_STRATEGY: StrategyConfig = {
@@ -80,6 +86,7 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   recycle_surplus: 0,
   expansion_bias: 'toward_food',
   relocate_food: 0,
+  scout_ratio: 0.12,
 };
 
 /** Hand written strategies, used for LLM-free matches and as a baseline. */
@@ -96,6 +103,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0.5,
     expansion_bias: 'toward_food',
     relocate_food: 0,
+    scout_ratio: 0.1,
   },
   rush: {
     unit_production_ratio: { worker: 0.35, soldier: 0.65 },
@@ -108,6 +116,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0,
     expansion_bias: 'toward_food',
     relocate_food: 0,
+    scout_ratio: 0.05,
   },
   harass: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -122,6 +131,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0,
     expansion_bias: 'toward_enemy',
     relocate_food: 0.5,
+    scout_ratio: 0.25,
   },
   turtle: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -134,6 +144,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0,
     expansion_bias: 'toward_safety',
     relocate_food: 0,
+    scout_ratio: 0.08,
   },
   blockade: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -146,6 +157,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0.5,
     expansion_bias: 'toward_enemy',
     relocate_food: 0.5,
+    scout_ratio: 0.2,
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -158,6 +170,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     recycle_surplus: 0,
     expansion_bias: 'toward_food',
     relocate_food: 0,
+    scout_ratio: 0.45,
   },
 };
 
@@ -236,6 +249,7 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
       recycle_surplus: numberOr(input.recycle_surplus, 'recycle_surplus', 0, 1, fallback.recycle_surplus),
       expansion_bias: bias,
       relocate_food: numberOr(input.relocate_food, 'relocate_food', 0, 1, fallback.relocate_food),
+      scout_ratio: numberOr(input.scout_ratio, 'scout_ratio', 0, 1, fallback.scout_ratio),
     },
     warnings,
   };
@@ -286,6 +300,13 @@ export const STRATEGY_JSON_SCHEMA = {
       description:
         'Willingness to take a bad fight. Low values retreat to the nest at high health and only engage when locally stronger. High values fight to the death.',
     },
+    scout_ratio: {
+      type: 'number',
+      minimum: 0,
+      maximum: 1,
+      description:
+        'Fraction of idle workers sent to explore rather than haul. There is fog of war: every enemy_ metric is a belief built from what your units have actually seen, and beliefs expire after 120 seconds. Scouting is how you keep them current. 0 means you will be fighting on memory, and enemy_intel_age_seconds is how you notice.',
+    },
     relocate_food: {
       type: 'number',
       minimum: 0,
@@ -325,5 +346,6 @@ export const STRATEGY_JSON_SCHEMA = {
     'recycle_surplus',
     'expansion_bias',
     'relocate_food',
+    'scout_ratio',
   ],
 } as const;

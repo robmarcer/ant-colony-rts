@@ -1,10 +1,39 @@
 # Changelog
 
-Current version: **0.23.0**. 23 releases, 156 recorded changes.
+Current version: **0.24.0**. 24 releases, 166 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.24.0 — Fog of war
+
+2026-08-20 20:21 (UTC+07:00) · committed · 10 changes
+
+**Simulation**
+
+- A colony now knows only what its own units have seen, and forgets after 120 seconds. Every enemy_ rule metric is a belief built from sightings, so it can be wrong in both directions: measured at 300 seconds a colony that does not scout believed 0 enemy workers when there were 47, and late in a match a hard scouting colony believed 381 when there were 263, because it remembers armies that have since died.
+- New metric enemy_intel_age_seconds, seconds since the last sighting of anything of theirs, which is how a rule tells current information from remembered information. Both colonies know where the other home nest is from the start; every nest founded later has to be found.
+- Fog gates intelligence, not perception. A unit still fights whatever is next to it whether or not the colony remembers it, which is asserted directly.
+- New eleventh knob scout_ratio, the fraction of idle workers exploring rather than hauling. It is paid for in food: 3,596 hauled at 0.6 against 10,656 at 0.12.
+
+**Unit AI**
+
+- Removed clairvoyance from five strategic decisions that had been reading the truth: where a harassing soldier hunts, which nest an attack marches on, how far from the enemy a founding queen believes she is settling, and the enemy-distance terms in both worker foraging and guard post scoring. All now use beliefs.
+- Fix: Scouting initially bought no intelligence at all. Scouts swept a ring of radius 20 to 110 around their own nests while the enemy sits 170 cells away, so at 300 seconds a colony scouting hard believed exactly as much as one that never scouted, which was nothing. A share of the effort now probes toward the nearest known nest with lateral spread, after which 0.6 had found 24 of their 36 workers.
+- Fix: Then scout_aggressively was made to add on top of the knob rather than set a floor, which took preset-scout to 78% of decisions spent exploring. It could not feed itself and lost 36 of 36 matches, rating 491, the scouting definition placed last in the field by the feature that makes scouting matter. The priority now sets a floor, preserving the old behaviour exactly, and it is back to 1393.
+
+**Balance**
+
+- Field re-measured over 180 matches from a cleared store: claude-v1 2311, example-adaptive and example-mass-rush both 1732, preset-boom 1700, preset-balanced 1558, preset-blockade 1421, preset-scout 1393, preset-rush 1272, preset-turtle 1202, preset-harass 679. Fog compressed the field, since reactive strategies now react to beliefs.
+
+**Viewer**
+
+- New fog selector redraws the map as either colony sees it: own units solid, remembered enemies as hollow ghosts fading with staleness, only discovered food, and their nests only where known. This is what made the scouting bug visible.
+
+**Tests**
+
+- Ten checks: a non-scout is blind at 300 seconds while a scout is not, its intelligence is fresher, scouting costs food, the enemy home nest is known from the start, counts report beliefs rather than facts, a sighting is remembered and then forgotten once stale, and a unit still fights what is adjacent with no memory of it.
 
 ## 0.23.0 — Workers can ferry a pile closer to home
 

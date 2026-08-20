@@ -9,6 +9,8 @@ import {
   DT,
   MAP_HEIGHT,
   MAP_WIDTH,
+  INTEL_INTERVAL,
+  INTEL_MEMORY_SECONDS,
   MAX_NESTS_PER_COLONY,
   NEST_RADIUS,
   NEST_REGEN_PER_SECOND,
@@ -36,6 +38,8 @@ import type {
   Colony,
   ColonyId,
   FoodSource,
+  KnownEnemy,
+  KnownNest,
   Nest,
   MatchEvent,
   MatchEventType,
@@ -145,6 +149,15 @@ export class Simulation {
       }
     }
 
+    // Both colonies know where the other started. Anything else has to be seen.
+    for (const colony of this.colonies) {
+      const enemy = this.enemyColony(colony.id);
+      const home = enemy.nests[0];
+      if (home) {
+        colony.knownEnemyNests.set(home.id, { nestId: home.id, x: home.x, y: home.y, lastSeenTick: 0 });
+      }
+    }
+
     this.pushEvent('match_start', null, `Match start, seed ${this.seed}`, true);
     this.rebuildRoster();
   }
@@ -165,6 +178,9 @@ export class Simulation {
       ruleActiveSince: new Map(),
       strategyChangedTick: 0,
       knownFood: new Map(),
+      knownEnemies: new Map(),
+      knownEnemyNests: new Map(),
+      lastSightingTick: -99999,
       unitsProduced: { queen: 1, worker: STARTING_WORKERS, soldier: 0 },
       nestsFounded: 0,
       unitsRecycled: { queen: 0, worker: 0, soldier: 0 },
@@ -563,6 +579,7 @@ export class Simulation {
     // is a third of a second of latency on spotting food, which no strategy can
     // perceive, and it removes a units-times-sources pass from most ticks.
     if (this.tick % 3 === 0) this.updateKnownFood();
+    if (this.tick % INTEL_INTERVAL === 0) this.updateIntel();
 
     if (this.tick % Math.round(RULE_EVAL_INTERVAL_SECONDS * TICKS_PER_SECOND) === 0) {
       this.evaluateBehaviour();
@@ -657,6 +674,109 @@ export class Simulation {
         }
       }
     }
+  }
+
+  /**
+   * The visibility pass. Anything an enemy unit or nest is within vision of gets
+   * recorded as a belief, with the tick it was seen. Beliefs expire after
+   * INTEL_MEMORY_SECONDS so that scouting keeps paying and stale information
+   * cannot masquerade as current.
+   *
+   * This is strategic intelligence only. It does not gate combat: a soldier
+   * still fights whatever is in front of it, because that is perception rather
+   * than memory.
+   */
+  private updateIntel(): void {
+    const memoryTicks = INTEL_MEMORY_SECONDS * TICKS_PER_SECOND;
+
+    for (const id of [0, 1] as ColonyId[]) {
+      const colony = this.colonies[id];
+      const enemy = this.enemyColony(id);
+
+      for (const watcher of this.roster[id]) {
+        const vision = UNIT_STATS[watcher.type].vision;
+
+        for (const seen of this.near(enemy.id, watcher, vision)) {
+          if (Math.hypot(seen.x - watcher.x, seen.y - watcher.y) > vision) continue;
+          colony.knownEnemies.set(seen.id, {
+            unitId: seen.id,
+            type: seen.type,
+            x: seen.x,
+            y: seen.y,
+            hpFraction: seen.hp / seen.maxHp,
+            founding: seen.type === 'queen' && seen.foundingSite !== null,
+            lastSeenTick: this.tick,
+          });
+          colony.lastSightingTick = this.tick;
+        }
+
+        for (const nest of enemy.nests) {
+          if (Math.hypot(nest.x - watcher.x, nest.y - watcher.y) > vision) continue;
+          colony.knownEnemyNests.set(nest.id, {
+            nestId: nest.id,
+            x: nest.x,
+            y: nest.y,
+            lastSeenTick: this.tick,
+          });
+        }
+      }
+
+      // Forget what has not been seen for a while, and anything we watched die.
+      for (const [unitId, belief] of colony.knownEnemies) {
+        if (this.tick - belief.lastSeenTick > memoryTicks) colony.knownEnemies.delete(unitId);
+      }
+      for (const [nestId, belief] of colony.knownEnemyNests) {
+        // A nest we can currently see is either there or gone; if we are looking
+        // at where it was and it is not there, drop it.
+        const stillThere = enemy.nests.some((nest) => nest.id === nestId);
+        const watched = this.roster[id].some(
+          (watcher) => Math.hypot(belief.x - watcher.x, belief.y - watcher.y) <= UNIT_STATS[watcher.type].vision,
+        );
+        if (watched && !stillThere) colony.knownEnemyNests.delete(nestId);
+      }
+    }
+  }
+
+  /** Enemy units this colony currently believes exist. */
+  believedEnemies(colony: ColonyId): KnownEnemy[] {
+    return [...this.colonies[colony].knownEnemies.values()];
+  }
+
+  believedEnemyCount(colony: ColonyId, type: UnitType): number {
+    let n = 0;
+    for (const belief of this.colonies[colony].knownEnemies.values()) if (belief.type === type) n++;
+    return n;
+  }
+
+  /** Enemy nests this colony knows of. Their home nest is known from the start. */
+  believedEnemyNests(colony: ColonyId): KnownNest[] {
+    return [...this.colonies[colony].knownEnemyNests.values()];
+  }
+
+  nearestBelievedEnemyNest(colony: ColonyId, at: Vec): KnownNest | null {
+    let best: KnownNest | null = null;
+    let bestDist = Infinity;
+    for (const nest of this.colonies[colony].knownEnemyNests.values()) {
+      const d = Math.hypot(nest.x - at.x, nest.y - at.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = nest;
+      }
+    }
+    return best;
+  }
+
+  /** Distance to the nearest enemy nest this colony knows about. */
+  distanceToBelievedEnemyNest(colony: ColonyId, at: Vec): number {
+    const nest = this.nearestBelievedEnemyNest(colony, at);
+    return nest ? Math.hypot(nest.x - at.x, nest.y - at.y) : MAP_WIDTH;
+  }
+
+  /** Seconds since this colony last laid eyes on any enemy unit. */
+  intelAgeSeconds(colony: ColonyId): number {
+    const last = this.colonies[colony].lastSightingTick;
+    if (last < 0) return this.simSeconds;
+    return (this.tick - last) / TICKS_PER_SECOND;
   }
 
   private regenInNest(unit: Unit): void {

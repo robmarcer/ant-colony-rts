@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CORPSE_DENSITY,
+  INTEL_MEMORY_SECONDS,
   RELOCATE_DROP_DISTANCE,
   CORPSE_VALUE_FRACTION,
   FOOD_TYPE_STATS,
@@ -211,6 +212,106 @@ console.log('losing one queen is not losing the match');
     'the reason is colony elimination',
     sim.outcome.status === 'finished' && sim.outcome.reason === 'colony_eliminated',
     sim.outcome.status === 'finished' ? sim.outcome.reason : 'running',
+  );
+}
+
+console.log('fog of war');
+{
+  const scouting = (ratio: number) =>
+    parse({ id: 'f', name: 'f', base: { ...PRESETS.balanced, scout_ratio: ratio }, rules: [] }, 'f').definition;
+
+  // Measured at 300 seconds, not at the end. By the end both colonies are in
+  // constant contact and everyone knows roughly everything, and a hard scout
+  // actually over-counts because it remembers armies that have since died.
+  // Early is when information is scarce and the knob is worth having.
+  const observe = (ratio: number) => {
+    const sim = new Simulation({ seed: '1', timeLimitSeconds: 900, definitions: [scouting(ratio), def('o', 'boom')] });
+    sim.run(3000);
+    return {
+      believed: sim.believedEnemyCount(0, 'worker'),
+      actual: sim.countUnits(1, 'worker'),
+      age: sim.intelAgeSeconds(0),
+      hauled: sim.colonies[0].lifetimeFoodGathered,
+    };
+  };
+
+  const blind = observe(0);
+  const looking = observe(0.6);
+  check(
+    'a colony that does not scout is still in the dark at 300 seconds',
+    blind.believed === 0,
+    `believed ${blind.believed} of ${blind.actual}`,
+  );
+  check(
+    'a colony that scouts has found them by then',
+    looking.believed > 0,
+    `believed ${looking.believed} of ${looking.actual}`,
+  );
+  check(
+    'and its intelligence is fresher',
+    looking.age < blind.age,
+    `${Math.round(looking.age)}s against ${Math.round(blind.age)}s`,
+  );
+  check(
+    'scouting is paid for in food, not free',
+    looking.hauled < blind.hauled,
+    `${Math.round(looking.hauled)} hauled scouting against ${Math.round(blind.hauled)} not`,
+  );
+
+  // Enemy figures must be beliefs, not facts.
+  const fresh = new Simulation({ seed: 'fog', timeLimitSeconds: 900, definitions: [scouting(0), def('o', 'boom')] });
+  fresh.run(300);
+  const metrics = fresh.metricsFor(0);
+  check(
+    'the enemy home nest is known from the start',
+    fresh.believedEnemyNests(0).length >= 1 && metrics.enemy_nests >= 1,
+  );
+  check(
+    'enemy counts report what has been seen, not what exists',
+    metrics.enemy_workers < fresh.countUnits(1, 'worker'),
+    `believes ${metrics.enemy_workers}, actually ${fresh.countUnits(1, 'worker')}`,
+  );
+  check(
+    'intel age grows while nothing has been seen',
+    metrics.enemy_intel_age_seconds > 20,
+    `${Math.round(metrics.enemy_intel_age_seconds)}s`,
+  );
+
+  // A belief must expire, or one early sighting would last the match.
+  const memory = new Simulation({ seed: 'mem', timeLimitSeconds: 900, definitions: [scouting(0), def('o', 'boom')] });
+  memory.run(100);
+  const target = memory.unitsOf(1)[0];
+  memory.colonies[0].knownEnemies.set(target.id, {
+    unitId: target.id,
+    type: target.type,
+    x: target.x,
+    y: target.y,
+    hpFraction: 1,
+    founding: false,
+    lastSeenTick: memory.tick,
+  });
+  check('a sighting is remembered', memory.colonies[0].knownEnemies.has(target.id));
+  memory.run(INTEL_MEMORY_SECONDS * 10 + 60);
+  check(
+    'and forgotten once it goes stale',
+    !memory.colonies[0].knownEnemies.has(target.id),
+    `${memory.colonies[0].knownEnemies.size} beliefs held`,
+  );
+
+  // Fog is strategic. It must not blind a unit to what is in front of it.
+  const contact = new Simulation({ seed: 'contact', timeLimitSeconds: 300, definitions: [def('a', 'boom'), def('b', 'boom')] });
+  contact.run(200);
+  const mine = contact.unitsOf(0).find((u) => u.type === 'worker')!;
+  const theirs = contact.unitsOf(1).find((u) => u.type === 'worker')!;
+  theirs.x = mine.x + 0.3;
+  theirs.y = mine.y;
+  contact.colonies[0].knownEnemies.clear();
+  const hpBefore = theirs.hp;
+  contact.run(30);
+  check(
+    'a unit still fights what is next to it, remembered or not',
+    theirs.hp < hpBefore,
+    'fog gates intelligence, not perception',
   );
 }
 

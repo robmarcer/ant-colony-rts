@@ -18,21 +18,32 @@ export function computeMetrics(sim: Simulation, colonyId: ColonyId): Metrics {
   // "Near a nest" means near any of that colony's nests, so these metrics keep
   // working the same way for a colony that has expanded.
   const nearRadius = NEST_RADIUS + 8;
+  // Enemies at our own nests are seen directly, so this is not a belief.
   let enemiesNearMyNest = 0;
   for (const unit of sim.enemiesOf(colonyId)) {
     if (unit.type === 'queen') continue;
     if (sim.distanceToNearestNest(colonyId, unit) <= nearRadius) enemiesNearMyNest++;
   }
+  // Our own units near a nest we believe they have.
   let myUnitsNearEnemyNest = 0;
   for (const unit of sim.unitsOf(colonyId)) {
     if (unit.type === 'queen') continue;
-    if (sim.distanceToNearestNest(enemy.id, unit) <= nearRadius) myUnitsNearEnemyNest++;
+    if (sim.distanceToBelievedEnemyNest(colonyId, unit) <= nearRadius) myUnitsNearEnemyNest++;
   }
 
   const myWorkers = sim.countUnits(colonyId, 'worker');
   const mySoldiers = sim.countUnits(colonyId, 'soldier');
-  const enemyWorkers = sim.countUnits(enemy.id, 'worker');
-  const enemySoldiers = sim.countUnits(enemy.id, 'soldier');
+  // Enemy figures are beliefs, not facts: what this colony has seen and not yet
+  // forgotten. They can be stale, they can be wrong, and enemy_intel_age_seconds
+  // is how a definition tells the difference.
+  const enemyWorkers = sim.believedEnemyCount(colonyId, 'worker');
+  const enemySoldiers = sim.believedEnemyCount(colonyId, 'soldier');
+  const believedQueens = sim.believedEnemyCount(colonyId, 'queen');
+  const believedFounding = sim.believedEnemies(colonyId).filter((b) => b.founding).length;
+  const believedQueenHp = sim
+    .believedEnemies(colonyId)
+    .filter((b) => b.type === 'queen')
+    .reduce((lowest, b) => Math.min(lowest, b.hpFraction), 1);
   const lost = colony.unitsLost;
 
   return {
@@ -47,13 +58,14 @@ export function computeMetrics(sim: Simulation, colonyId: ColonyId): Metrics {
     enemy_units: enemyWorkers + enemySoldiers,
     soldier_advantage: mySoldiers - enemySoldiers,
     my_nests: colony.nests.length,
-    enemy_nests: enemy.nests.length,
+    enemy_nests: sim.believedEnemyNests(colonyId).length,
     my_queens: sim.queensOf(colonyId).length,
-    enemy_queens: sim.queensOf(enemy.id).length,
+    enemy_queens: believedQueens,
     my_founding_queens: sim.foundingQueensOf(colonyId).length,
-    enemy_founding_queens: sim.foundingQueensOf(enemy.id).length,
+    enemy_founding_queens: believedFounding,
     my_queen_hp_pct: sim.lowestQueenHealth(colonyId) * 100,
-    enemy_queen_hp_pct: sim.lowestQueenHealth(enemy.id) * 100,
+    enemy_queen_hp_pct: believedQueens > 0 ? believedQueenHp * 100 : 0,
+    enemy_intel_age_seconds: sim.intelAgeSeconds(colonyId),
     known_food_sources: colony.knownFood.size,
     known_food_amount: knownFoodAmount,
     units_lost_total: lost.worker + lost.soldier,

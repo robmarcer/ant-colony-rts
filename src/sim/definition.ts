@@ -51,6 +51,12 @@ export const RULE_METRICS = [
   'kills',
   'enemies_near_my_nest',
   'my_units_near_enemy_nest',
+  /**
+   * Seconds since this colony last laid eyes on any enemy unit. Every other
+   * enemy_ metric is a belief that may be this stale, so this is how a rule
+   * tells current information from remembered information.
+   */
+  'enemy_intel_age_seconds',
 ] as const;
 
 export type RuleMetric = (typeof RULE_METRICS)[number];
@@ -142,6 +148,7 @@ const KNOB_KEYS = new Set([
   'recycle_surplus',
   'expansion_bias',
   'relocate_food',
+  'scout_ratio',
 ]);
 
 export function slugify(input: string): string {
@@ -347,6 +354,7 @@ export const DEFINITION_DOC = {
     recycle_surplus: 'number 0..1',
     expansion_bias: EXPANSION_BIASES,
     relocate_food: 'number 0..1',
+    scout_ratio: 'number 0..1',
   },
   rule_metrics: RULE_METRICS,
   rule_ops: RULE_OPS,

@@ -329,12 +329,27 @@ Operators: `gt`, `gte`, `lt`, `lte`, `eq`.
 
 ## What the colony knows
 
-There is no fog of war in v1, so unit counts and positions are global. Food is
-different: a source only enters a colony's memory once one of that colony's
-units walks within vision range of it (12 cells for a worker, 14 for a soldier,
-12 for a queen). Idle workers pick targets from that shared memory, which is the
-intel mechanic. Scouting has real value because unexplored food is invisible to
-your foragers even though the map is otherwise open.
+There is fog of war. A colony knows what its own units have seen, and forgets it
+after 120 seconds.
+
+Vision is 12 cells for a worker, 14 for a soldier, 12 for a queen. Anything an
+enemy unit or nest comes within that of gets recorded, with the time it was seen.
+Every `enemy_` rule metric is built from those records, so it can be out of date
+in either direction: blind early, and over-counting late, because a remembered
+army may already be dead. `enemy_intel_age_seconds` reports how long since the
+last sighting, and is how a rule distinguishes current from remembered.
+
+Both colonies know where the other's home nest is from the start. Any nest
+founded later has to be found.
+
+Fog covers intelligence, not perception. A unit still fights whatever is next to
+it whether or not the colony remembers it, because that is seeing rather than
+knowing. What fog changes is the strategic picture: where a harassing soldier
+goes hunting, which nest an attack marches on, how far from the enemy a queen
+thinks she is settling, and every number a rule reads.
+
+Food works the same way: a pile only enters memory once a unit walks within
+vision of it, and idle workers pick targets from that shared memory.
 
 ## Food types
 

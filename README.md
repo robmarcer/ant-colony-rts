@@ -322,8 +322,8 @@ The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
 matches are not degenerate. Current state, measured over a round robin of the
 starter definitions across two seeds (112 matches):
 
-- Win rates spread from 0% to 94% across ten definitions, on the ladder over 180
-  comparable matches.
+- Win rates spread from 0% to 100% across ten definitions, on the ladder over 180
+  comparable matches under fog of war.
 - The strongest definition is `claude-v1`, written by a model reading
   `docs/agent-brief.md` and the ladder, at 2052.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
@@ -332,10 +332,13 @@ starter definitions across two seeds (112 matches):
 - Every strategy above 60% expands. The two one-nest presets sit at 28% and 16%.
 - Area denial is strong: preset-blockade, which does nothing but post soldiers on
   food, is second at 81%.
-- Food types shifted this again: army builds gained, because dense food means
-  fewer workers are needed to sustain one. example-mass-rush went from 1507 to
-  1699 and preset-rush from 807 to 1183, while pure economy fell, preset-boom
-  from 2061 to 1673.
+- Fog of war compressed the field: with enemy figures now beliefs that can be
+  blind or stale, reactive strategies lost some of their edge. example-adaptive
+  and example-mass-rush both sit at 1732, preset-boom at 1700, and the spread
+  between second and eighth narrowed to 530 points.
+- Measurements quoted here come from a cleared match store, for the reason in
+  issue #25: the balance fingerprint does not cover simulation behaviour, so a
+  code change can leave stale matches looking comparable.
 - Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
   walk, so expansion is a strong play whose real cost is the 200 food and the
   minute of lost production rather than the risk of interception.

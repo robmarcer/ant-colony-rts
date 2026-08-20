@@ -7,6 +7,12 @@ const COLONY_DIM: [string, string] = ['#7a5418', '#1d5c6e'];
 
 export interface RenderOptions {
   showIntel: boolean;
+  /**
+   * Draw the world as this colony believes it to be: its own units and nests,
+   * the food it has found, and remembered enemy positions as ghosts. -1 draws
+   * everything, which is what an observer sees.
+   */
+  fogView: -1 | 0 | 1;
 }
 
 /** Top down canvas view. Purely a projection of sim state, holds no state itself. */
@@ -52,8 +58,14 @@ export class Renderer {
 
     if (options.showIntel) this.drawIntel(sim);
 
-    // Food and corpses.
-    for (const source of sim.food.values()) {
+    // Food and corpses. Under fog, only what the viewing colony has found.
+    const visibleFood =
+      options.fogView === -1
+        ? [...sim.food.values()]
+        : [...sim.colonies[options.fogView].knownFood.values()]
+            .map((known) => sim.food.get(known.foodId))
+            .filter((source): source is NonNullable<typeof source> => !!source);
+    for (const source of visibleFood) {
       const radius = Math.max(1.2, Math.sqrt(Math.max(source.amount, 1)) * 0.16) * s;
       if (source.kind === 'corpse') {
         ctx.fillStyle = '#7a6a52';
@@ -73,10 +85,15 @@ export class Renderer {
 
     // Nests. A colony can have several once it has produced more queens.
     for (const colony of sim.colonies) {
+      // Under fog, their nests are only the ones the viewer knows about.
+      const nests =
+        options.fogView === -1 || colony.id === options.fogView
+          ? colony.nests
+          : sim.believedEnemyNests(options.fogView).map((known) => ({ ...known, x: known.x, y: known.y }));
       ctx.strokeStyle = COLONY_COLOURS[colony.id];
       ctx.fillStyle = 'rgba(255,255,255,0.04)';
       ctx.lineWidth = Math.max(1, s * 0.25);
-      for (const nest of colony.nests) {
+      for (const nest of nests) {
         ctx.beginPath();
         ctx.arc(nest.x * s, nest.y * s, NEST_RADIUS * s, 0, Math.PI * 2);
         ctx.fill();
@@ -100,7 +117,35 @@ export class Renderer {
     }
     ctx.setLineDash([]);
 
-    for (const unit of sim.units.values()) this.drawUnit(unit);
+    if (options.fogView === -1) {
+      for (const unit of sim.units.values()) this.drawUnit(unit);
+    } else {
+      const viewer = options.fogView;
+      for (const unit of sim.units.values()) {
+        if (unit.owner === viewer) this.drawUnit(unit);
+      }
+      // Remembered enemies, drawn hollow and faded by how stale the memory is.
+      for (const belief of sim.believedEnemies(viewer)) {
+        const age = (sim.tick - belief.lastSeenTick) / 10;
+        this.drawGhost(belief.x, belief.y, belief.type, viewer === 0 ? 1 : 0, age);
+      }
+    }
+  }
+
+  /**
+   * A remembered enemy. Hollow, because it is a belief rather than a sighting,
+   * and fading with age so stale intelligence looks stale.
+   */
+  private drawGhost(x: number, y: number, type: string, owner: number, ageSeconds: number): void {
+    const { ctx } = this;
+    const s = this.scale;
+    const fade = Math.max(0.15, 1 - ageSeconds / 120);
+    ctx.strokeStyle = owner === 0 ? `rgba(240,168,60,${fade})` : `rgba(69,184,216,${fade})`;
+    ctx.lineWidth = 1;
+    const r = (type === 'queen' ? 2.4 : type === 'soldier' ? 1.25 : 0.72) * s;
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   /**

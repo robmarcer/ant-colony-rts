@@ -244,13 +244,14 @@ function chooseFoundingSite(sim: Simulation, colony: Colony, parent: Nest): Vec 
 
   const farEnoughFromOwn = (point: Vec): boolean =>
     colony.nests.every((nest) => Math.hypot(nest.x - point.x, nest.y - point.y) >= MIN_NEST_SEPARATION);
+  // A founding queen is sent somewhere that looks safe from what the colony
+  // knows. Settling next to a nest it never scouted is a real risk of not
+  // scouting.
   const farEnoughFromEnemy = (point: Vec): boolean =>
-    enemy.nests.every((nest) => Math.hypot(nest.x - point.x, nest.y - point.y) >= MIN_ENEMY_NEST_DISTANCE);
-  const enemyDistance = (point: Vec): number => {
-    let best = Infinity;
-    for (const nest of enemy.nests) best = Math.min(best, Math.hypot(nest.x - point.x, nest.y - point.y));
-    return best === Infinity ? MAP_WIDTH : best;
-  };
+    sim
+      .believedEnemyNests(colony.id)
+      .every((nest) => Math.hypot(nest.x - point.x, nest.y - point.y) >= MIN_ENEMY_NEST_DISTANCE);
+  const enemyDistance = (point: Vec): number => sim.distanceToBelievedEnemyNest(colony.id, point);
 
   let best: Vec | null = null;
   let bestScore = -Infinity;
@@ -442,11 +443,18 @@ function workerFightTarget(sim: Simulation, unit: Unit, strategy: StrategyConfig
 /** Pick a food source from colony memory, or go exploring. */
 function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: StrategyConfig): void {
   const known = [...colony.knownFood.values()].filter((k) => k.estAmount > 0.5);
-  const scoutChance = strategy.expansion_priority === 'scout_aggressively' ? 0.45 : 0.12;
+  // The priority sets a floor, the knob can raise it. Adding them stacked
+  // instead, which took preset-scout to 78% of decisions spent exploring: it
+  // could not feed itself and lost 36 of 36 matches. A floor keeps the old
+  // scout_aggressively behaviour exactly and lets the knob go further.
+  const scoutChance = Math.max(
+    strategy.scout_ratio,
+    strategy.expansion_priority === 'scout_aggressively' ? 0.45 : 0,
+  );
 
   if (known.length === 0 || sim.rng.next() < scoutChance) {
     unit.state = 'scouting';
-    unit.moveTo = scoutPoint(sim, colony);
+    unit.moveTo = scoutPoint(sim, colony, strategy);
     moveToward(unit, unit.moveTo, UNIT_STATS.worker.speed);
     return;
   }
@@ -458,7 +466,9 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
     // Distances are measured to the closest nest, so founding a nest near food
     // immediately makes that food look more attractive to every worker.
     const dNest = sim.distanceToNearestNest(colony.id, candidate);
-    const dEnemyNest = sim.distanceToNearestNest(sim.enemyColony(colony.id).id, candidate);
+    // Believed, not actual: a colony discounts food near where it thinks their
+    // nests are, which is the only thing it could reasonably act on.
+    const dEnemyNest = sim.distanceToBelievedEnemyNest(colony.id, candidate);
 
     // Energy per trip, not just proximity: a rich pile is worth walking past a
     // thin one for. Density 1 is neutral so this changes nothing for corpses or
@@ -526,7 +536,7 @@ function relocationTarget(
   if (source.amount < RELOCATE_MIN_PILE) return null;
 
   const fromUs = sim.distanceToNearestNest(colony.id, source);
-  const fromThem = sim.distanceToNearestNest(sim.enemyColony(colony.id).id, source);
+  const fromThem = sim.distanceToBelievedEnemyNest(colony.id, source);
   const contested = fromThem < fromUs;
   if (fromUs < RELOCATE_MIN_DISTANCE && !contested) return null;
 
@@ -546,9 +556,34 @@ function relocationTarget(
   };
 }
 
-/** Explore outward from one of the colony's nests, chosen at random. */
-function scoutPoint(sim: Simulation, colony: Colony): Vec {
+/**
+ * Where a scout goes.
+ *
+ * A ring around our own nests finds food but never finds the enemy: the nests
+ * are 170 cells apart and the ring reaches 110, so measured at 300 seconds a
+ * colony scouting hard still believed nothing at all about its opponent. Part of
+ * the scouting effort is therefore aimed down the line toward their territory,
+ * in proportion to scout_ratio, which is what makes the knob buy intelligence
+ * rather than only calories.
+ */
+function scoutPoint(sim: Simulation, colony: Colony, strategy: StrategyConfig): Vec {
   const from = colony.nests.length > 0 ? sim.rng.pick(colony.nests) : colony.homeNest;
+
+  // The harder a colony scouts, the more of that effort probes toward them.
+  if (sim.rng.next() < strategy.scout_ratio) {
+    const target = sim.nearestBelievedEnemyNest(colony.id, from) ?? sim.enemyColony(colony.id).homeNest;
+    const dx = target.x - from.x;
+    const dy = target.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    // Somewhere along the way, with enough spread to sweep rather than beeline.
+    const along = sim.rng.range(0.45, 1.0);
+    const spread = sim.rng.range(-40, 40);
+    return {
+      x: clamp(from.x + dx * along - (dy / length) * spread, 1, MAP_WIDTH - 1),
+      y: clamp(from.y + dy * along + (dx / length) * spread, 1, MAP_HEIGHT - 1),
+    };
+  }
+
   const angle = sim.rng.range(0, Math.PI * 2);
   const radius = sim.rng.range(20, 110);
   return {
@@ -696,23 +731,32 @@ function pushTarget(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec 
     case 'guard_food':
       return guardPost(sim, unit, strategy);
     case 'harass_enemy_workers': {
-      // A queen walking to a founding site is the best prize on the map: 200
-      // food and 60 seconds of build time, slow, and usually unescorted. A
-      // harasser goes for her over a worker whenever one is within reach.
-      let bestQueen: Unit | null = null;
+      // Hunting from memory, not omniscience. A queen walking to a site is the
+      // best prize on the map, so she is preferred if one has been seen.
+      let best: Vec | null = null;
       let bestDist = 90;
-      for (const queen of sim.foundingQueensOf(enemyColony.id)) {
-        const d = Math.hypot(queen.x - unit.x, queen.y - unit.y);
+      for (const belief of sim.believedEnemies(unit.owner)) {
+        if (!belief.founding) continue;
+        const d = Math.hypot(belief.x - unit.x, belief.y - unit.y);
         if (d < bestDist) {
           bestDist = d;
-          bestQueen = queen;
+          best = { x: belief.x, y: belief.y };
         }
       }
-      if (bestQueen) return { x: bestQueen.x, y: bestQueen.y };
+      if (best) return best;
 
-      const prey = sim.nearestEnemyOfType(unit, 'worker', Infinity);
-      if (prey) return { x: prey.x, y: prey.y };
-      return sim.nearestNest(enemyColony.id, unit) ?? enemyColony.homeNest;
+      let prey: Vec | null = null;
+      let preyDist = Infinity;
+      for (const belief of sim.believedEnemies(unit.owner)) {
+        if (belief.type !== 'worker') continue;
+        const d = Math.hypot(belief.x - unit.x, belief.y - unit.y);
+        if (d < preyDist) {
+          preyDist = d;
+          prey = { x: belief.x, y: belief.y };
+        }
+      }
+      if (prey) return prey;
+      return sim.nearestBelievedEnemyNest(unit.owner, unit) ?? enemyColony.homeNest;
     }
     case 'escort_workers': {
       const home = sim.nearestNest(unit.owner, unit) ?? sim.colonies[unit.owner].homeNest;
@@ -730,12 +774,10 @@ function pushTarget(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec 
     }
     case 'attack_enemy_nest':
     default: {
-      // Go for the closest enemy nest rather than always the original one, so
-      // a push does not walk past a nearer target on the way to the far one.
-      const nest = sim.nearestNest(enemyColony.id, unit);
-      if (nest) return nest;
-      const queen = sim.queensOf(enemyColony.id)[0];
-      return queen ? { x: queen.x, y: queen.y } : enemyColony.homeNest;
+      // The closest nest we know of, which may be out of date. Marching on a
+      // nest that has since been abandoned is a real cost of poor scouting.
+      const nest = sim.nearestBelievedEnemyNest(unit.owner, unit);
+      return nest ?? enemyColony.homeNest;
     }
   }
 }
@@ -768,7 +810,7 @@ function guardPost(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
   for (const known of colony.knownFood.values()) {
     if (known.estAmount < GUARD_MIN_FOOD) continue;
     const fromUs = sim.distanceToNearestNest(colony.id, known);
-    const fromThem = sim.distanceToNearestNest(enemy.id, known);
+    const fromThem = sim.distanceToBelievedEnemyNest(colony.id, known);
     // Positive when the pile is closer to them than to us, which is the food
     // worth taking off them. Capped both ways: uncapped, the best denial score
     // always belongs to the pile touching their nest, and supportability has to

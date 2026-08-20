@@ -28,6 +28,7 @@ const pastSelect = el<HTMLSelectElement>('pastMatch');
 const seedInput = el<HTMLInputElement>('seed');
 const limitInput = el<HTMLInputElement>('limit');
 const showIntel = el<HTMLInputElement>('showIntel');
+const fogView = el<HTMLSelectElement>('fogView');
 const playPause = el<HTMLButtonElement>('playPause');
 const eventLog = el<HTMLOListElement>('eventLog');
 const summary = el<HTMLDivElement>('summary');
@@ -177,7 +178,10 @@ function frame(now: number): void {
 
 function render(): void {
   if (!sim) return;
-  renderer.draw(sim, { showIntel: showIntel.checked });
+  renderer.draw(sim, {
+    showIntel: showIntel.checked,
+    fogView: Number(fogView.value) as -1 | 0 | 1,
+  });
   updatePanels();
   appendEvents();
   const progress = Math.min(1, sim.tick / sim.timeLimitTicks);

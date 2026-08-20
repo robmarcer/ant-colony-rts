@@ -103,6 +103,29 @@ export interface FoodSource {
   deaths: number;
 }
 
+/**
+ * What a colony believes about one enemy unit it has seen. Beliefs are what rules
+ * and state summaries read: they can be stale, and they expire.
+ */
+export interface KnownEnemy {
+  unitId: number;
+  type: UnitType;
+  x: number;
+  y: number;
+  hpFraction: number;
+  /** True while the unit was a queen walking to found a nest when last seen. */
+  founding: boolean;
+  lastSeenTick: number;
+}
+
+/** A remembered enemy nest. Home nests are known from the start. */
+export interface KnownNest {
+  nestId: number;
+  x: number;
+  y: number;
+  lastSeenTick: number;
+}
+
 /** One entry in a colony's shared memory of where food is. */
 export interface KnownFood {
   foodId: number;
@@ -141,6 +164,12 @@ export interface Colony {
   ruleActiveSince: Map<string, number>;
   strategyChangedTick: number;
   knownFood: Map<number, KnownFood>;
+  /** Enemy units this colony has seen and not yet forgotten. */
+  knownEnemies: Map<number, KnownEnemy>;
+  /** Enemy nests this colony knows about, seeded with their home nest. */
+  knownEnemyNests: Map<number, KnownNest>;
+  /** Tick of the most recent enemy sighting, for intel age. */
+  lastSightingTick: number;
   unitsProduced: Record<UnitType, number>;
   nestsFounded: number;
   /** Own units consumed by a queen to change the army's composition. */
