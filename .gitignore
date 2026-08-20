@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+logs/*.jsonl
+
+# Generated match records. Definitions are committed; results are not, since
+# they are reproducible from (definition, definition, seed).
+matches/
+
+# Profiler output
+isolate-*.log

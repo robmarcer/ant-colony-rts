@@ -1,0 +1,21 @@
+{
+  "id": "preset-harass",
+  "name": "preset-harass",
+  "author": "hand",
+  "version": 1,
+  "notes": "Built-in harass preset. Static knobs, no rules. Useful as a baseline opponent.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.6,
+      "soldier": 0.4
+    },
+    "aggression": 0.65,
+    "expansion_priority": "contest_enemy_food",
+    "min_worker_reserve": 8,
+    "soldier_posture": "harass_enemy_workers",
+    "risk_tolerance": 0.6,
+    "target_nests": 2
+  },
+  "rules": [],
+  "updatedAt": "2026-08-20T06:39:27.309Z"
+}

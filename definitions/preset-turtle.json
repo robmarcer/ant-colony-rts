@@ -1,0 +1,21 @@
+{
+  "id": "preset-turtle",
+  "name": "preset-turtle",
+  "author": "hand",
+  "version": 1,
+  "notes": "Built-in turtle preset. Static knobs, no rules. Useful as a baseline opponent.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.6,
+      "soldier": 0.4
+    },
+    "aggression": 0,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 10,
+    "soldier_posture": "defend_nest",
+    "risk_tolerance": 0.15,
+    "target_nests": 1
+  },
+  "rules": [],
+  "updatedAt": "2026-08-20T06:29:26.694Z"
+}

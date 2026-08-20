@@ -1,0 +1,21 @@
+{
+  "id": "preset-scout",
+  "name": "preset-scout",
+  "author": "hand",
+  "version": 1,
+  "notes": "Built-in scout preset. Static knobs, no rules. Useful as a baseline opponent.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.8,
+      "soldier": 0.2
+    },
+    "aggression": 0.3,
+    "expansion_priority": "scout_aggressively",
+    "min_worker_reserve": 10,
+    "soldier_posture": "escort_workers",
+    "risk_tolerance": 0.5,
+    "target_nests": 3
+  },
+  "rules": [],
+  "updatedAt": "2026-08-20T06:29:26.694Z"
+}

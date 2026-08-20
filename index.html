@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ant Colony RTS</title>
+    <link rel="stylesheet" href="/src/ui/styles.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <span class="brand">Ant Colony RTS</span>
+      <label>A <select id="defA"></select></label>
+      <label>B <select id="defB"></select></label>
+      <label>seed <input id="seed" value="1" size="6" /></label>
+      <label>limit <input id="limit" value="900" size="4" />s</label>
+      <button id="newMatch" class="primary">New match</button>
+      <span class="spacer"></span>
+      <label>past <select id="pastMatch"><option value="">-</option></select></label>
+      <label class="check"><input type="checkbox" id="showIntel" /> intel</label>
+      <a id="versionLink" class="version" href="#changelog" title="What changed, and when">
+        <span id="versionNumber">v0.0.0</span> changelog
+      </a>
+    </header>
+
+    <main>
+      <section class="stage">
+        <canvas id="canvas"></canvas>
+        <div class="controls">
+          <button id="playPause">Pause</button>
+          <span class="speeds">
+            <button data-speed="1">1x</button>
+            <button data-speed="2">2x</button>
+            <button data-speed="5">5x</button>
+            <button data-speed="20">20x</button>
+            <button data-speed="max">max</button>
+          </span>
+          <button id="restart">Restart</button>
+          <div class="progress"><div id="progressFill"></div></div>
+          <span id="clock" class="clock">0s</span>
+        </div>
+      </section>
+
+      <aside class="side">
+        <div id="panelA" class="panel"></div>
+        <div id="panelB" class="panel"></div>
+        <div class="panel log">
+          <h3>Event log</h3>
+          <p class="hint">Rule activations, strategy changes and major events. No LLM is consulted during a match.</p>
+          <ol id="eventLog"></ol>
+        </div>
+      </aside>
+    </main>
+
+    <div id="summary" class="summary hidden"></div>
+    <div id="changelog" class="summary hidden"></div>
+    <script type="module" src="/src/ui/main.ts"></script>
+  </body>
+</html>

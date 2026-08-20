@@ -1,0 +1,73 @@
+{
+  "id": "example-mass-rush",
+  "name": "example-mass-rush",
+  "author": "hand",
+  "version": 1,
+  "notes": "Holds every soldier at home until a ball of 12 exists, then commits at the nearest enemy nest. A trickle of single soldiers dies for nothing, so the timing rule is the whole strategy. Takes a second nest first, because one nest can only support 40 units and 12 soldiers out of 40 is a thin army.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.5,
+      "soldier": 0.5
+    },
+    "aggression": 0,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 10,
+    "soldier_posture": "defend_nest",
+    "risk_tolerance": 0.5,
+    "target_nests": 2
+  },
+  "rules": [
+    {
+      "id": "commit",
+      "note": "attack only once a real ball of soldiers exists",
+      "when": [
+        {
+          "metric": "my_soldiers",
+          "op": "gte",
+          "value": 12
+        }
+      ],
+      "set": {
+        "aggression": 1,
+        "soldier_posture": "attack_enemy_nest",
+        "risk_tolerance": 0.85
+      }
+    },
+    {
+      "id": "regroup",
+      "note": "if the push is wiped out, go home and rebuild, and do not expand while losing",
+      "when": [
+        {
+          "metric": "my_soldiers",
+          "op": "lte",
+          "value": 4
+        }
+      ],
+      "set": {
+        "aggression": 0,
+        "soldier_posture": "defend_nest",
+        "target_nests": 1
+      }
+    },
+    {
+      "id": "grow-on-a-win",
+      "note": "once their army is gone there is nothing stopping a third nest",
+      "when": [
+        {
+          "metric": "soldier_advantage",
+          "op": "gte",
+          "value": 8
+        },
+        {
+          "metric": "sim_seconds",
+          "op": "gte",
+          "value": 240
+        }
+      ],
+      "set": {
+        "target_nests": 3
+      }
+    }
+  ],
+  "updatedAt": "2026-08-20T06:33:35.329Z"
+}

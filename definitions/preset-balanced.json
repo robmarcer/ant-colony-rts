@@ -1,0 +1,21 @@
+{
+  "id": "preset-balanced",
+  "name": "preset-balanced",
+  "author": "hand",
+  "version": 1,
+  "notes": "Built-in balanced preset. Static knobs, no rules. Useful as a baseline opponent.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.7,
+      "soldier": 0.3
+    },
+    "aggression": 0.2,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 5,
+    "soldier_posture": "defend_nest",
+    "risk_tolerance": 0.4,
+    "target_nests": 2
+  },
+  "rules": [],
+  "updatedAt": "2026-08-20T06:29:26.693Z"
+}

@@ -1,0 +1,130 @@
+{
+  "id": "example-adaptive",
+  "name": "example-adaptive",
+  "author": "hand",
+  "version": 1,
+  "notes": "Worked example. Expand early, then build an army, with a panic clause. Copy this and change it rather than starting from a blank file.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.85,
+      "soldier": 0.15
+    },
+    "aggression": 0.1,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 12,
+    "soldier_posture": "defend_nest",
+    "risk_tolerance": 0.3,
+    "target_nests": 2
+  },
+  "rules": [
+    {
+      "id": "third-nest",
+      "note": "a second nest paid off, so take a third once the economy can carry it",
+      "when": [
+        {
+          "metric": "my_nests",
+          "op": "gte",
+          "value": 2
+        },
+        {
+          "metric": "my_workers",
+          "op": "gte",
+          "value": 30
+        }
+      ],
+      "set": {
+        "target_nests": 3
+      }
+    },
+    {
+      "id": "stop-expanding-under-pressure",
+      "note": "a walking queen is 200 food handed to the enemy if the map is not safe",
+      "when": [
+        {
+          "metric": "enemies_near_my_nest",
+          "op": "gte",
+          "value": 2
+        }
+      ],
+      "set": {
+        "target_nests": 1
+      }
+    },
+    {
+      "id": "midgame-army",
+      "note": "after two minutes the easy food is thinning out, start building an army",
+      "when": [
+        {
+          "metric": "sim_seconds",
+          "op": "gte",
+          "value": 120
+        }
+      ],
+      "set": {
+        "unit_production_ratio": {
+          "worker": 0.6,
+          "soldier": 0.4
+        },
+        "aggression": 0.4,
+        "soldier_posture": "escort_workers"
+      }
+    },
+    {
+      "id": "punish-weak-enemy",
+      "note": "if they have no army by three minutes, go for the queen",
+      "when": [
+        {
+          "metric": "sim_seconds",
+          "op": "gte",
+          "value": 180
+        },
+        {
+          "metric": "soldier_advantage",
+          "op": "gte",
+          "value": 4
+        }
+      ],
+      "set": {
+        "aggression": 0.85,
+        "soldier_posture": "attack_enemy_nest",
+        "risk_tolerance": 0.7
+      }
+    },
+    {
+      "id": "defend-home",
+      "note": "panic clause, overrides the pushes above because it is later in the list",
+      "when": [
+        {
+          "metric": "enemies_near_my_nest",
+          "op": "gte",
+          "value": 3
+        }
+      ],
+      "set": {
+        "aggression": 0,
+        "soldier_posture": "defend_nest",
+        "risk_tolerance": 0.9
+      }
+    },
+    {
+      "id": "rebuild-economy",
+      "note": "if the worker base collapses, stop making soldiers and stop expanding",
+      "when": [
+        {
+          "metric": "my_workers",
+          "op": "lte",
+          "value": 5
+        }
+      ],
+      "set": {
+        "unit_production_ratio": {
+          "worker": 1,
+          "soldier": 0
+        },
+        "min_worker_reserve": 10,
+        "target_nests": 1
+      }
+    }
+  ],
+  "updatedAt": "2026-08-20T06:33:35.328Z"
+}

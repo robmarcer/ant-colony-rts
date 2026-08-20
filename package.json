@@ -1,0 +1,32 @@
+{
+  "name": "ant-colony-rts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "2D top-down ant colony RTS used as a testbed for pitting LLM-authored strategies against each other",
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "match": "tsx src/headless/run.ts",
+    "selftest": "tsx src/headless/selftest.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "coach": "tsx src/coach/coach.ts",
+    "changelog": "tsx src/meta/write-changelog.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "concurrently": "^9.2.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  }
+}
