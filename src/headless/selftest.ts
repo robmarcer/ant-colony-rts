@@ -6,6 +6,7 @@ import { Simulation } from '../sim/sim.js';
 import { parseDefinition } from '../sim/definition.js';
 import { DEFAULT_STRATEGY, EXPANSION_PRIORITIES, PRESETS, SOLDIER_POSTURES } from '../sim/strategy.js';
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../match/runner.js';
+import { runMirror, winRateInterval } from '../match/tournament.js';
 import { balanceFingerprint } from '../meta/fingerprint.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -751,6 +752,41 @@ console.log('replay is version pinned');
   }
   check('replaying a record from before version stamping is refused', refusedUnstamped);
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
+}
+
+console.log('map fairness');
+{
+  // The interval maths first, since every fairness verdict rests on it.
+  const even = winRateInterval(5, 10);
+  check('an even split brackets 50%', even.low <= 0.5 && even.high >= 0.5, `${even.low.toFixed(2)}-${even.high.toFixed(2)}`);
+  const total = winRateInterval(10, 10);
+  check('a clean sweep does not bracket 50%', total.low > 0.5, `${total.low.toFixed(2)}-${total.high.toFixed(2)}`);
+  check('no games means nothing is disproved', winRateInterval(0, 0).high === 1);
+  const wide = winRateInterval(3, 4);
+  const narrow = winRateInterval(750, 1000);
+  check(
+    'a bigger sample gives a tighter interval',
+    wide.high - wide.low > narrow.high - narrow.low,
+    `${(wide.high - wide.low).toFixed(2)} vs ${(narrow.high - narrow.low).toFixed(2)}`,
+  );
+
+  const mirror = runMirror({
+    definition: def('m', 'balanced'),
+    seeds: ['1', '2', '3', '4', '5', '6'],
+    timeLimitSeconds: 600,
+  });
+  check('a mirror match plays every seed', mirror.games === 6, String(mirror.games));
+  check(
+    'every mirror game is accounted for',
+    mirror.sideAWins + mirror.sideBWins + mirror.draws === mirror.games,
+    `${mirror.sideAWins}+${mirror.sideBWins}+${mirror.draws}`,
+  );
+  check('the reported rate sits inside its own interval', mirror.sideARate >= mirror.low && mirror.sideARate <= mirror.high);
+  check(
+    'a definition against itself is not decided by which side it played',
+    mirror.fair,
+    `side A won ${(mirror.sideARate * 100).toFixed(0)}% (${(mirror.low * 100).toFixed(0)}-${(mirror.high * 100).toFixed(0)}%)`,
+  );
 }
 
 console.log('the project is installable');

@@ -1,10 +1,28 @@
 # Changelog
 
-Current version: **0.16.0**. 16 releases, 114 recorded changes.
+Current version: **0.17.0**. 17 releases, 119 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.17.0 — Map fairness is measured, not assumed
+
+2026-08-20 17:42 (UTC+07:00) · committed · 5 changes
+
+**Balance**
+
+- Measured over 360 matches, 40 seeds for each of nine definitions. All nine individually cover an even split. Pooled, side A won 193 of 358 decided matches: 53.9%, interval 48.7 to 59.0%.
+- Honest reading: no side bias is demonstrated, and none is cleanly ruled out either. The point estimate leans four points to side A and the lower bound sits 1.3 points below half. A larger sample would settle it. Series and round robins already swap sides on every seed, which cancels a residual bias rather than assuming there is none, so existing measurements are protected either way.
+
+**Tests**
+
+- Eight checks: the interval brackets an even split, refuses to bracket a clean sweep, tightens with sample size, treats zero games as proving nothing, and a mirror match accounts for every seed and reports a rate inside its own interval.
+
+**Tooling**
+
+- npm run match -- --mirror plays a definition against itself across seeds and reports side A win rate with a 95% Wilson interval. Wilson rather than the normal approximation because it stays sane at small samples and near 0 or 1, which is where a fairness check lives.
+- Reports a pooled figure across every definition as well as per definition. The aggregate is the sensitive test: at 40 seeds each definition has an interval roughly 30 points wide, so a small bias would hide inside all of them while still showing in the pooled result.
 
 ## 0.16.0 — Installable and runnable on plain Node
 

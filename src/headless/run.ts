@@ -6,7 +6,7 @@
  *   npm run match -- --list
  */
 import { NotReplayable, replayRecord, runMatch } from '../match/runner.js';
-import { runRoundRobin, runSeries } from '../match/tournament.js';
+import { runMirror, runRoundRobin, runSeries, winRateInterval } from '../match/tournament.js';
 import {
   ensureStarterDefinitions,
   listDefinitionIds,
@@ -80,6 +80,49 @@ if (args.list) {
     console.log(`${id.padEnd(20)} v${definition.version ?? 1} by ${definition.author ?? '?'} (${definition.rules.length} rules)`);
   }
   process.exit(0);
+}
+
+if (args.mirror) {
+  // A definition against itself should win about half the time. If it does not,
+  // the map is not fair and every other measurement inherits the bias.
+  const seedCount = Number(args.seeds ?? 40);
+  const seeds = Array.from({ length: seedCount }, (_, i) => String(i + 1));
+  const timeLimitSeconds = Number(args.time ?? 900);
+  const ids = args.mirror === true ? listDefinitionIds() : String(args.mirror).split(',');
+
+  console.log(`mirror matches over ${seedCount} seeds at ${timeLimitSeconds}s, 95% interval on side A's win rate`);
+  console.log('definition             A won   B won  draws   side A rate      95% interval   verdict');
+  let anyBias = false;
+  let totalA = 0;
+  let totalB = 0;
+  for (const id of ids) {
+    const result = runMirror({ definition: loadDefinition(id).definition, seeds, timeLimitSeconds });
+    totalA += result.sideAWins;
+    totalB += result.sideBWins;
+    if (!result.fair) anyBias = true;
+    console.log(
+      `${result.id.padEnd(22)} ${String(result.sideAWins).padStart(5)} ${String(result.sideBWins).padStart(7)} ` +
+        `${String(result.draws).padStart(6)} ${(result.sideARate * 100).toFixed(1).padStart(11)}% ` +
+        `${`${(result.low * 100).toFixed(0)}-${(result.high * 100).toFixed(0)}%`.padStart(16)}   ` +
+        (result.fair ? 'fair' : `BIASED, side A won seeds ${result.sideASeeds.slice(0, 8).join(',')}`),
+    );
+  }
+  // The aggregate is the sensitive test. Each definition alone has a wide
+  // interval at these sample sizes, so a small bias would hide inside all of
+  // them while still showing up in the pooled result.
+  const pooled = winRateInterval(totalA, totalA + totalB);
+  const pooledFair = pooled.low <= 0.5 && pooled.high >= 0.5;
+  console.log('');
+  console.log(
+    `pooled across every definition: side A won ${totalA} of ${totalA + totalB} decided, ` +
+      `${(pooled.rate * 100).toFixed(1)}% (${(pooled.low * 100).toFixed(1)}-${(pooled.high * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    anyBias || !pooledFair
+      ? 'A side bias is indicated. Every other measurement in the project inherits it, and the round robin\'s side swapping only cancels it on average.'
+      : 'No side bias detected: every interval, and the pooled interval, covers an even split.',
+  );
+  process.exit(anyBias || !pooledFair ? 1 : 0);
 }
 
 if (args['round-robin']) {

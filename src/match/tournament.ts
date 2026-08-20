@@ -78,6 +78,99 @@ export function runSeries(options: SeriesOptions): SeriesResult {
   return result;
 }
 
+/**
+ * Wilson score interval for a binomial proportion. Preferred over the normal
+ * approximation because it stays sane at small sample sizes and near 0 or 1,
+ * which is exactly where a fairness check lives.
+ */
+export function winRateInterval(wins: number, games: number, z = 1.96): { rate: number; low: number; high: number } {
+  if (games === 0) return { rate: 0, low: 0, high: 1 };
+  const p = wins / games;
+  const denominator = 1 + (z * z) / games;
+  const centre = p + (z * z) / (2 * games);
+  const spread = z * Math.sqrt((p * (1 - p)) / games + (z * z) / (4 * games * games));
+  return {
+    rate: p,
+    low: Math.max(0, (centre - spread) / denominator),
+    high: Math.min(1, (centre + spread) / denominator),
+  };
+}
+
+export interface MirrorOptions {
+  definition: BehaviourDefinition;
+  seeds: Array<string | number>;
+  timeLimitSeconds?: number;
+}
+
+export interface MirrorResult {
+  id: string;
+  games: number;
+  sideAWins: number;
+  sideBWins: number;
+  draws: number;
+  /** Win rate for side A with a 95% interval. Fair means this covers 0.5. */
+  sideARate: number;
+  low: number;
+  high: number;
+  fair: boolean;
+  /** Seeds where side A won, for chasing a bias down. */
+  sideASeeds: Array<string | number>;
+  eliminations: number;
+}
+
+/**
+ * Play a definition against itself across seeds.
+ *
+ * Food is generated in mirrored pairs about the map centre specifically so both
+ * colonies face an identical problem, and that had never been verified. If a
+ * definition against itself does not win about half the time, then every result
+ * this project has produced carries a side bias, and a ladder built on top would
+ * inherit it. This is the cheapest possible check on all of it.
+ */
+export function runMirror(options: MirrorOptions): MirrorResult {
+  const { definition, seeds } = options;
+  let sideAWins = 0;
+  let sideBWins = 0;
+  let draws = 0;
+  let eliminations = 0;
+  const sideASeeds: Array<string | number> = [];
+
+  for (const seed of seeds) {
+    const record = runMatch({
+      definitions: [definition, definition],
+      seed,
+      timeLimitSeconds: options.timeLimitSeconds,
+    });
+    if (record.result.reason === 'colony_eliminated') eliminations++;
+    if (record.result.winner === 0) {
+      sideAWins++;
+      sideASeeds.push(seed);
+    } else if (record.result.winner === 1) {
+      sideBWins++;
+    } else {
+      draws++;
+    }
+  }
+
+  const decided = sideAWins + sideBWins;
+  const interval = winRateInterval(sideAWins, decided);
+  return {
+    id: definition.id,
+    games: seeds.length,
+    sideAWins,
+    sideBWins,
+    draws,
+    sideARate: interval.rate,
+    low: interval.low,
+    high: interval.high,
+    // Fair means the interval covers an even split. With no decided games there
+    // is nothing to disprove, so that counts as fair.
+    fair: decided === 0 || (interval.low <= 0.5 && interval.high >= 0.5),
+    sideASeeds,
+    eliminations,
+  };
+}
+
 export interface RoundRobinOptions {
   definitions: BehaviourDefinition[];
   seeds: Array<string | number>;

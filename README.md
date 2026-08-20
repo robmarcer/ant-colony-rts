@@ -367,6 +367,26 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - Corpse piles merge by proximity to the first corpse in the pile; the pile does
   not drift toward the centre of the fighting.
 
+## Map fairness
+
+Food is generated in mirrored pairs about the map centre so both colonies face an
+identical problem. That is now checked rather than assumed:
+
+```bash
+npm run match -- --mirror --seeds 40 --time 900
+```
+
+Every definition plays itself across the seeds; a fair map means side A wins about
+half. Measured over 360 matches, all nine definitions individually cover an even
+split, and pooled, side A won 193 of 358 decided matches, 53.9% with a 95%
+interval of 48.7 to 59.0%.
+
+So no side bias is demonstrated, but it is not cleanly ruled out either: the
+point estimate leans four points to side A and the lower bound sits just below
+half. A larger sample would settle it. In the meantime series and round robins
+play every seed with the sides swapped, which cancels any residual bias rather
+than relying on there being none.
+
 ## Verification
 
 `npm run selftest` asserts 117 properties, including:
@@ -398,6 +418,8 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - soldiers on `guard_food` hold their post rather than chasing, are not posted on
   the enemy doorstep, are released when their pile runs out, and measurably deny
   the opponent food compared with sitting at home
+- a definition played against itself is not decided by which side it played, and
+  the interval maths behind that verdict behaves at small and large samples
 - the agent brief documents every knob, metric, posture, priority and operator,
   and the balance numbers it quotes match the config
 - the changelog is well formed: unique semver versions, parseable timestamps
