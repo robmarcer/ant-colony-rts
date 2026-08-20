@@ -17,8 +17,15 @@ export const DT = 1 / TICKS_PER_SECOND;
 export const MAP_WIDTH = 200;
 export const MAP_HEIGHT = 200;
 
-/** Default match length in sim seconds (15 minutes). */
-export const DEFAULT_TIME_LIMIT_SECONDS = 900;
+/**
+ * Default match length in sim seconds (25 hours of sim time).
+ *
+ * Set this high deliberately: the intent is that matches are decided by one
+ * colony eliminating the other rather than by the clock running out. See the
+ * note in README under Match length for what that means in practice, since the
+ * map's food is exhausted long before this limit.
+ */
+export const DEFAULT_TIME_LIMIT_SECONDS = 90000;
 
 export interface UnitStats {
   maxHp: number;
@@ -126,10 +133,22 @@ export const GATHER_RADIUS = 1.0;
  */
 export const CONTEST_MAX_HAUL = 100;
 
-/** Corpses drop this fraction of the unit's food cost, plus whatever it carried. */
-export const CORPSE_VALUE_FRACTION = 0.4;
-/** A queen leaves a flat amount rather than a fraction of her 200 food cost. */
-export const QUEEN_CORPSE_VALUE = 60;
+/**
+ * Corpses drop this fraction of the unit's food cost, plus whatever it carried.
+ *
+ * At 1.0 the map is a closed system: the total energy on it never changes. Food
+ * moves between four places, and nothing is ever created or destroyed:
+ *
+ *   food piles on the ground  <->  food carried by workers
+ *                             <->  a colony's stockpile
+ *                             <->  energy embodied in living units
+ *
+ * A unit is energy borrowed from the stockpile, and its death returns every
+ * point of it to the ground. Anything other than 1.0 makes combat a net drain
+ * on the world, so the conservation check in the self test will fail. Change it
+ * only if you intend that.
+ */
+export const CORPSE_VALUE_FRACTION = 1.0;
 /**
  * Corpses do not decay. Ground that has been fought over accumulates biomass
  * permanently, which makes an old battlefield worth holding and worth denying.

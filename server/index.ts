@@ -160,7 +160,9 @@ app.get('/api/schema', (_req, res) => {
       starting_food: STARTING_FOOD,
       starting_workers: STARTING_WORKERS,
       corpses:
-        'a dead unit leaves food where it fell: 4 for a worker, 12 for a soldier, 60 for a queen, plus whatever it carried. Corpses never decay, and one landing within 6 cells of an existing pile merges into it, so a battlefield becomes a permanent and substantial food source worth holding. By the late game, after the clusters are stripped, corpses are the only income left.',
+        'a dead unit returns its full cost where it fell: 10 for a worker, 30 for a soldier, 200 for a queen, plus whatever it carried. Corpses never decay, and one landing within 6 cells of an existing pile merges into it, so a battlefield becomes a permanent and substantial food source worth holding.',
+      closed_system:
+        'total energy on the map never changes. It moves between food on the ground, food carried by a worker, a colony stockpile, and the energy embodied in living units, and a death returns every point of it. A battle relocates value rather than destroying it, so winning a fight next to your own nest is worth much more than winning the same fight next to theirs.',
       nest_regen: 'units inside their own nest regain 3% of max health per second. Queens do not regenerate.',
     },
     unit_stats: UNIT_STATS,
@@ -299,6 +301,30 @@ app.get('/api/matches/:id/events', handler((req, res) => {
 
 /** Guard so a single request cannot tie the server up for many minutes. */
 const MAX_MATCHES_PER_REQUEST = 64;
+/**
+ * Rough seconds of compute per sim second, measured at roughly 1.1s for a 900
+ * second match and 30s for a 90,000 second one. Used to refuse a request that
+ * would block far longer than an HTTP client will wait, which matters now that
+ * the default match is long enough for a round robin to take most of an hour.
+ */
+const SECONDS_PER_SIM_SECOND = 1 / 800;
+const COMPUTE_BUDGET_SECONDS = 300;
+
+/** Null if the request fits the budget, otherwise an explanatory message. */
+function tooExpensive(matches: number, timeLimitSeconds: number, cliHint: string): string | null {
+  if (matches > MAX_MATCHES_PER_REQUEST) {
+    return `that is ${matches} matches, over the ${MAX_MATCHES_PER_REQUEST} limit. Use the CLI: ${cliHint}`;
+  }
+  const estimate = matches * timeLimitSeconds * SECONDS_PER_SIM_SECOND;
+  if (estimate > COMPUTE_BUDGET_SECONDS) {
+    return (
+      `that is ${matches} matches of ${timeLimitSeconds} sim seconds, roughly ${Math.round(estimate)}s of compute, ` +
+      `over the ${COMPUTE_BUDGET_SECONDS}s budget for one request. Lower timeLimitSeconds, use fewer seeds, ` +
+      `or run it on the CLI where nothing is waiting on a socket: ${cliHint}`
+    );
+  }
+  return null;
+}
 
 app.post('/api/series', handler((req, res) => {
   const { a, b, seeds = ['1', '2', '3'], timeLimitSeconds, swapSides = true, save = false } = req.body ?? {};
@@ -307,8 +333,10 @@ app.post('/api/series', handler((req, res) => {
     return;
   }
   const count = seeds.length * (swapSides ? 2 : 1);
-  if (count > MAX_MATCHES_PER_REQUEST) {
-    res.status(400).json({ error: `that is ${count} matches, over the ${MAX_MATCHES_PER_REQUEST} limit. Use the CLI: npm run match -- --a ${a} --b ${b} --repeat N` });
+  const limit = Number(timeLimitSeconds ?? DEFAULT_TIME_LIMIT_SECONDS);
+  const refusal = tooExpensive(count, limit, `npm run match -- --a ${a} --b ${b} --repeat N`);
+  if (refusal) {
+    res.status(400).json({ error: refusal });
     return;
   }
   const defA = loadDefinition(String(a)).definition;
@@ -327,8 +355,10 @@ app.post('/api/round-robin', handler((req, res) => {
     : all;
   const pairings = (chosen.length * (chosen.length - 1)) / 2;
   const count = pairings * seeds.length * 2;
-  if (count > MAX_MATCHES_PER_REQUEST) {
-    res.status(400).json({ error: `that is ${count} matches, over the ${MAX_MATCHES_PER_REQUEST} limit. Use the CLI: npm run match -- --round-robin --seeds ${seeds.join(',')}` });
+  const limit = Number(timeLimitSeconds ?? DEFAULT_TIME_LIMIT_SECONDS);
+  const refusal = tooExpensive(count, limit, `npm run match -- --round-robin --seeds ${seeds.join(',')}`);
+  if (refusal) {
+    res.status(400).json({ error: refusal });
     return;
   }
   res.json(runRoundRobin({ definitions: chosen, seeds, timeLimitSeconds }));

@@ -36,6 +36,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.0',
+    timestamp: '2026-08-20T14:45:00+07:00',
+    title: 'The map is a closed system',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'Corpses return 100% of the unit cost rather than 40%, plus whatever the unit was carrying. A worker now leaves 10, a soldier 30, a queen 200. Energy on the map is neither created nor destroyed: it only moves between the ground, a worker in transit, a colony stockpile, and the units built from it.' },
+      { area: 'sim', detail: 'A queen dying mid-build also returns the energy already invested in the unit she was producing. Without this, killing a queen quietly destroyed up to 200 food of brood and the system was not closed.', fix: true },
+      { area: 'sim', detail: 'Removed QUEEN_CORPSE_VALUE. A queen returns her actual cost, so there is no longer a special case to keep in step with the price of a queen.' },
+      { area: 'sim', detail: 'New Simulation.totalEnergy(), summing food on the ground, in transit, banked, and embodied in living and part-built units.' },
+      { area: 'tests', detail: 'Conservation is asserted, not assumed: energy is sampled every 100 ticks across a 3,000 second match and must not drift by more than 1e-6, with a separate check for a queen killed mid-build. Measured drift was exactly zero across 30,000 ticks.' },
+      { area: 'balance', detail: 'Combat is no longer a net drain on the world, so a long match settles into a sustainable attrition equilibrium instead of both colonies starving. Battlefields are richer: a dead soldier is now worth 30 rather than 12.' },
+      { area: 'docs', detail: 'README, the authoring guide and GET /api/schema updated with the new corpse values and the closed system property.' },
+    ],
+  },
+  {
+    version: '0.5.0',
+    timestamp: '2026-08-20T14:30:00+07:00',
+    title: 'Default match length raised to 90,000 sim seconds',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'DEFAULT_TIME_LIMIT_SECONDS raised from 900 to 90,000, so matches are decided by one colony eliminating the other rather than by the clock. The viewer default matches.' },
+      { area: 'api', detail: 'The series and round robin endpoints now refuse a request whose estimated compute exceeds 300 seconds, rather than only counting matches. At the new default one match is roughly 30 seconds of compute, so the old count-only guard would have allowed a request that blocked for half an hour.', fix: true },
+      { area: 'docs', detail: 'README records what long matches actually do, measured: a decisive pairing still ends in about 360 seconds, but two passive strategies run the full 90,000 and cost 30 seconds of compute each.' },
+    ],
+  },
+  {
     version: '0.4.0',
     timestamp: '2026-08-20T14:05:00+07:00',
     title: 'Changelog, app version and version control',

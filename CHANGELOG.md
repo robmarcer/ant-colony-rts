@@ -1,10 +1,49 @@
 # Changelog
 
-Current version: **0.4.0**. 4 releases, 40 recorded changes.
+Current version: **0.6.0**. 6 releases, 50 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.6.0 — The map is a closed system
+
+2026-08-20 14:45 (UTC+07:00) · committed · 7 changes
+
+**Simulation**
+
+- Corpses return 100% of the unit cost rather than 40%, plus whatever the unit was carrying. A worker now leaves 10, a soldier 30, a queen 200. Energy on the map is neither created nor destroyed: it only moves between the ground, a worker in transit, a colony stockpile, and the units built from it.
+- Fix: A queen dying mid-build also returns the energy already invested in the unit she was producing. Without this, killing a queen quietly destroyed up to 200 food of brood and the system was not closed.
+- Removed QUEEN_CORPSE_VALUE. A queen returns her actual cost, so there is no longer a special case to keep in step with the price of a queen.
+- New Simulation.totalEnergy(), summing food on the ground, in transit, banked, and embodied in living and part-built units.
+
+**Balance**
+
+- Combat is no longer a net drain on the world, so a long match settles into a sustainable attrition equilibrium instead of both colonies starving. Battlefields are richer: a dead soldier is now worth 30 rather than 12.
+
+**Tests**
+
+- Conservation is asserted, not assumed: energy is sampled every 100 ticks across a 3,000 second match and must not drift by more than 1e-6, with a separate check for a queen killed mid-build. Measured drift was exactly zero across 30,000 ticks.
+
+**Docs**
+
+- README, the authoring guide and GET /api/schema updated with the new corpse values and the closed system property.
+
+## 0.5.0 — Default match length raised to 90,000 sim seconds
+
+2026-08-20 14:30 (UTC+07:00) · committed · 3 changes
+
+**Simulation**
+
+- DEFAULT_TIME_LIMIT_SECONDS raised from 900 to 90,000, so matches are decided by one colony eliminating the other rather than by the clock. The viewer default matches.
+
+**API**
+
+- Fix: The series and round robin endpoints now refuse a request whose estimated compute exceeds 300 seconds, rather than only counting matches. At the new default one match is roughly 30 seconds of compute, so the old count-only guard would have allowed a request that blocked for half an hour.
+
+**Docs**
+
+- README records what long matches actually do, measured: a decisive pairing still ends in about 360 seconds, but two passive strategies run the full 90,000 and cost 30 seconds of compute each.
 
 ## 0.4.0 — Changelog, app version and version control
 

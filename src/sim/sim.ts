@@ -11,7 +11,6 @@ import {
   MAX_NESTS_PER_COLONY,
   NEST_RADIUS,
   NEST_REGEN_PER_SECOND,
-  QUEEN_CORPSE_VALUE,
   SCORE_WEIGHTS,
   STARTING_FOOD,
   STARTING_WORKERS,
@@ -645,11 +644,12 @@ export class Simulation {
     owner.recentLosses += 1;
     this.colonies[killer].kills++;
 
-    // A dead ant is food. Corpses decay so late-game maps do not silt up with
-    // free calories, and so a lost fight is only a temporary windfall.
-    const value =
-      unit.type === 'queen' ? QUEEN_CORPSE_VALUE : Math.round(UNIT_STATS[unit.type].cost * CORPSE_VALUE_FRACTION);
-    this.addCorpse({ x: unit.x, y: unit.y }, value + unit.carrying);
+    // A dead ant is food, and returns every point of energy it was built from.
+    // A queen also returns whatever she had already invested in the unit she was
+    // building; the brood dies with her, but the energy does not vanish.
+    let value = UNIT_STATS[unit.type].cost * CORPSE_VALUE_FRACTION + unit.carrying;
+    if (unit.build) value += UNIT_STATS[unit.build.type].cost * CORPSE_VALUE_FRACTION;
+    this.addCorpse({ x: unit.x, y: unit.y }, value);
 
     for (const other of this.units.values()) {
       if (other.targetEnemyId === unit.id) other.targetEnemyId = null;
@@ -799,6 +799,25 @@ export class Simulation {
     if (this.tick >= this.timeLimitTicks) {
       finish(scores[0] === scores[1] ? null : scores[0] > scores[1] ? 0 : 1, 'time_limit');
     }
+  }
+
+  /**
+   * Total energy on the map: food on the ground, food in transit, food banked,
+   * and the energy embodied in every living unit and every part-built one.
+   *
+   * With CORPSE_VALUE_FRACTION at 1.0 this is invariant for the whole match.
+   * The self test asserts that, which is what makes "closed system" a checked
+   * property rather than an intention.
+   */
+  totalEnergy(): number {
+    let total = 0;
+    for (const source of this.food.values()) total += source.amount;
+    for (const colony of this.colonies) total += colony.food;
+    for (const unit of this.units.values()) {
+      total += UNIT_STATS[unit.type].cost + unit.carrying;
+      if (unit.build) total += UNIT_STATS[unit.build.type].cost;
+    }
+    return total;
   }
 
   /** Cheap state fingerprint, used by the self test to prove determinism. */

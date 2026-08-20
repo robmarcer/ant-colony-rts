@@ -198,17 +198,24 @@ your foragers even though the map is otherwise open.
 
 ## Battlefields
 
-Corpses do not decay. A dead worker leaves 4 food, a soldier 12, a queen 60, plus
-whatever they were carrying, and corpses within 6 cells of an existing pile merge
-into it. So wherever a battle happened there is now a permanent pile, and a big
-engagement leaves one worth several hundred food.
+Corpses do not decay, and they return the unit's full cost: 10 for a worker, 30
+for a soldier, 200 for a queen, plus whatever they were carrying. Corpses within
+6 cells of an existing pile merge into it, so wherever a battle happened there is
+a permanent pile, and a big engagement leaves one worth many hundreds of food.
 
-This matters for two reasons. Piles are ordinary food sources, so
-`largest_food_first` will send workers to a large battlefield ahead of a fresh
-cluster, and `contest_enemy_food` will fight over one in the middle of the map.
-And by the late game the clusters are gone: a strong colony strips its half of the
-map by around 700 seconds, after which corpses are the only income there is.
-Ground you fought over is ground worth keeping workers on.
+The map is a closed system. Total energy never changes; it only moves between the
+ground, a worker in transit, your stockpile, and the units you built. Nothing is
+consumed and nothing is lost. Three consequences worth planning around:
+
+- A battle does not destroy value, it relocates it. Winning a fight beside your
+  own nest is worth far more than winning the same fight beside theirs, because
+  the loser's army is now food and whoever has workers nearby collects it.
+- Piles are ordinary food sources, so `largest_food_first` sends workers to a
+  large battlefield ahead of a fresh cluster, and `contest_enemy_food` will fight
+  over one in the middle of the map.
+- The clusters get stripped, but the energy does not leave. Late game, most of
+  the map's food is either embodied in living units or lying on old
+  battlefields. Ground you fought over is ground worth keeping workers on.
 
 A pile only enters your memory once one of your units walks within vision of it,
 same as any other food, so a battle you were not present at is invisible until

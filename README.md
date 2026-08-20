@@ -145,15 +145,56 @@ how close to the enemy you will settle.
 - Home nests at (40,40) and (160,160). Food is generated in mirrored pairs about
   the map centre, so both colonies face an identical map and any difference in
   outcome comes from the strategies.
-- 10 ticks per sim second, 900 sim second default limit.
+- 10 ticks per sim second, 90,000 sim second default limit (see Match length).
 - Units are queen, worker and soldier. Stats live in `src/sim/config.ts`.
-- A dead unit leaves food where it fell: 4 for a worker, 12 for a soldier (40%
-  of cost), a flat 60 for a queen, plus whatever it was carrying. Corpses are
-  modelled as food sources so foraging logic needs no second code path.
+- A dead unit leaves its full cost where it fell: 10 for a worker, 30 for a
+  soldier, 200 for a queen, plus whatever it was carrying. Corpses are modelled
+  as food sources so foraging logic needs no second code path.
 - Corpses never decay, and one landing within 6 cells of an existing pile merges
   into it. Ground that has been fought over accumulates permanently, so an old
-  battlefield is territory worth holding. In a measured match, 74 deaths became
-  13 piles and the largest held 307 food, more than a new queen costs.
+  battlefield is territory worth holding.
+
+## The map is a closed system
+
+Total energy on the map never changes. It only moves between four places:
+
+```
+food piles on the ground  <->  food carried by a worker
+                          <->  a colony's stockpile
+                          <->  energy embodied in a living unit
+```
+
+A unit is energy borrowed from the stockpile, and its death returns every point
+of it to the ground. A queen killed part way through building something returns
+that investment too. `Simulation.totalEnergy()` sums all four, and the self test
+samples it every 100 ticks across a 3,000 second match and fails on any drift
+above 1e-6. Measured drift is exactly zero.
+
+This is why combat is not a net drain on the world, and why a long match reaches
+an attrition equilibrium rather than both colonies starving. It also means the
+score's `lifetimeFood` term measures circulation, not extraction: the same food
+can be hauled, spent, killed and hauled again.
+
+`CORPSE_VALUE_FRACTION` in `src/sim/config.ts` is the switch. Anything other
+than 1.0 makes the world leak, and the conservation check will say so.
+
+## Match length
+
+The default limit is 90,000 sim seconds, high enough that matches are normally
+decided by elimination rather than the clock. What that means in practice,
+measured:
+
+| Pairing | Ends at | Compute |
+|---|---|---|
+| example-mass-rush vs preset-boom | 360s, elimination | 0.1s |
+| preset-boom vs preset-turtle | 90,000s, time limit | 26s |
+| preset-turtle vs preset-turtle | 90,000s, time limit | 30s |
+
+A decisive pairing resolves quickly and costs nothing. Two passive strategies
+never resolve, so they burn the full limit: turtle against turtle spends 25 hours
+of sim time with both colonies parked at their one-nest population ceiling,
+banking around 10,000 food each and doing nothing with it. Lower `--time` for
+round robins, or the sweep will take most of an hour rather than a minute.
 - Units regain 3% of maximum health per second inside their own nest. Queens do
   not regenerate.
 - No fog of war. Unit positions are global; food still has to be discovered by
@@ -249,7 +290,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 53 properties, including:
+`npm run selftest` asserts 58 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk
@@ -265,6 +306,8 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
   last one ends it as `colony_eliminated`
 - corpses do not decay, nearby ones merge into a single pile, distant ones do
   not, and a fought-over match leaves piles worth more than a worker can carry
+- energy is conserved: total energy on the map does not drift across a whole
+  match, including when a queen dies part way through building a unit
 - the changelog is well formed: unique semver versions, parseable timestamps
   carrying an offset, newest first, every entry has changes, `APP_VERSION`
   matches the newest entry, and a reconstructed entry never claims a commit

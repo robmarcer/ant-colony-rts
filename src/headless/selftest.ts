@@ -6,7 +6,14 @@ import { Simulation } from '../sim/sim.js';
 import { parseDefinition } from '../sim/definition.js';
 import { PRESETS } from '../sim/strategy.js';
 import { runMatch } from '../match/runner.js';
-import { MAP_HEIGHT, MAP_WIDTH, MIN_NEST_SEPARATION, UNITS_PER_NEST, UNIT_STATS } from '../sim/config.js';
+import {
+  CORPSE_VALUE_FRACTION,
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  MIN_NEST_SEPARATION,
+  UNITS_PER_NEST,
+  UNIT_STATS,
+} from '../sim/config.js';
 import { parseDefinition as parse } from '../sim/definition.js';
 import { APP_VERSION, CHANGELOG, totalChanges } from '../meta/changelog.js';
 
@@ -253,6 +260,45 @@ console.log('bad definitions are survivable');
   const sim = new Simulation({ seed: 'garbage', timeLimitSeconds: 60, definitions: [parsed.definition, def('b', 'boom')] });
   sim.run(700);
   check('a garbage definition still runs a match', sim.finished);
+}
+
+console.log('closed system');
+{
+  const sim = new Simulation({
+    seed: 'energy',
+    timeLimitSeconds: 3000,
+    definitions: [def('a', 'rush'), def('b', 'boom')],
+  });
+  const start = sim.totalEnergy();
+  let worst = 0;
+  // Sample throughout rather than only at the end, so a leak that is later
+  // masked by another cannot slip through.
+  for (let i = 0; i < 300; i++) {
+    sim.run(100);
+    worst = Math.max(worst, Math.abs(sim.totalEnergy() - start));
+  }
+  const drift = Math.abs(sim.totalEnergy() - start);
+  check('energy is conserved over a whole match', worst < 1e-6, `worst drift ${worst.toExponential(2)} from ${start}`);
+  check('no energy is created or destroyed by combat', drift < 1e-6, `final drift ${drift.toExponential(2)}`);
+  check('the match actually did something', sim.colonies.some((c) => c.unitsLost.worker + c.unitsLost.soldier > 0));
+  check('corpses return the full unit cost', CORPSE_VALUE_FRACTION === 1);
+
+  // A queen dying mid-build must return what she had already invested.
+  const mid = new Simulation({ seed: 'brood', timeLimitSeconds: 600, definitions: [def('a', 'boom'), def('b', 'boom')] });
+  mid.run(400);
+  const queen = mid.queensOf(0).find((q) => q.build);
+  if (!queen) {
+    check('found a queen mid-build to test brood refund', false);
+  } else {
+    const before = mid.totalEnergy();
+    queen.hp = 0;
+    mid.step();
+    check(
+      'a queen dying mid-build returns her brood energy too',
+      Math.abs(mid.totalEnergy() - before) < 1e-6,
+      `drift ${(mid.totalEnergy() - before).toFixed(6)}`,
+    );
+  }
 }
 
 console.log('changelog');
