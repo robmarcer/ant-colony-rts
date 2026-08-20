@@ -66,14 +66,30 @@ async function loadLists(): Promise<void> {
     select.value = definitions.some((d) => d.id === wanted) ? wanted : (definitions[index]?.id ?? '');
   }
 
-  const matches = await api<Array<{ id: string; a: string; b: string; winner: string | null; seed: string | number }>>(
-    '/api/matches?limit=40',
-  );
+  const matches = await api<
+    Array<{
+      id: string;
+      a: string;
+      b: string;
+      winner: string | null;
+      seed: string | number;
+      appVersion?: string;
+      replayable?: boolean;
+    }>
+  >('/api/matches?limit=40');
   pastSelect.innerHTML = '<option value="">-</option>';
   for (const row of matches) {
     const option = document.createElement('option');
     option.value = row.id;
-    option.textContent = `${row.a} vs ${row.b} seed ${row.seed} → ${row.winner ?? 'draw'}`;
+    const label = `${row.a} vs ${row.b} seed ${row.seed} → ${row.winner ?? 'draw'}`;
+    // A replay re-runs the simulation, so a record made by different code would
+    // quietly show a different game. Better to disable it and say why.
+    if (row.replayable) {
+      option.textContent = label;
+    } else {
+      option.textContent = `${label} (needs ${row.appVersion ?? 'an older build'})`;
+      option.disabled = true;
+    }
     pastSelect.append(option);
   }
 }

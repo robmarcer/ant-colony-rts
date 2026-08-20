@@ -1,14 +1,36 @@
 # Changelog
 
-Current version: **0.6.0**. 6 releases, 50 recorded changes.
+Current version: **0.7.0**. 7 releases, 56 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
 
+## 0.7.0 — Stored matches are pinned to the code that made them
+
+2026-08-20 14:32 (UTC+07:00) · committed · 6 changes
+
+**API**
+
+- Fix: Match records carry appVersion and balanceHash, the latter a hash over every tunable value exported from src/sim/config.ts. Without them a stored match was only reproducible by accident: the six records already on disk were made on a 100x100 map with decaying 40% corpses and a 900 second limit, and replaying one under 0.6.0 silently produced a different game.
+- New POST /api/matches/:id/replay re-runs a stored match and reports whether it reproduced. Returns 409, naming both the recorded and running version and balance, when this build cannot reproduce it.
+- GET /api/matches marks every row replayable or not against the running build, decided at read time rather than trusted from the file. GET /api/health reports the balance hash alongside the version.
+
+**Viewer**
+
+- Fix: The past-match picker disables records this build cannot reproduce and says which version they need, instead of quietly replaying a different game.
+
+**Tests**
+
+- Six checks covering the round trip: a fresh record is stamped and replays exactly, and replay is refused for a mismatched app version, mismatched balance numbers, and a record from before stamping existed. Both halves of the stamp are tested separately so neither can quietly stop being load bearing.
+
+**Tooling**
+
+- npm run match -- --replay [id] re-runs a stored match, defaulting to the newest, and exits 2 when the record cannot be reproduced. --matches lists stored records with their version and replay status.
+
 ## 0.6.0 — The map is a closed system
 
-2026-08-20 14:45 (UTC+07:00) · committed · 7 changes
+2026-08-20 14:10 (UTC+07:00) · committed · 7 changes
 
 **Simulation**
 
@@ -31,7 +53,7 @@ Entries marked *reconstructed* predate version control on this project. Their ti
 
 ## 0.5.0 — Default match length raised to 90,000 sim seconds
 
-2026-08-20 14:30 (UTC+07:00) · committed · 3 changes
+2026-08-20 14:10 (UTC+07:00) · committed · 3 changes
 
 **Simulation**
 
@@ -47,7 +69,7 @@ Entries marked *reconstructed* predate version control on this project. Their ti
 
 ## 0.4.0 — Changelog, app version and version control
 
-2026-08-20 14:05 (UTC+07:00) · reconstructed · 7 changes
+2026-08-20 14:03 (UTC+07:00) · committed · 7 changes
 
 **API**
 
@@ -94,7 +116,7 @@ Entries marked *reconstructed* predate version control on this project. Their ti
 
 ## 0.2.0 — Queens found new nests, and a map with room for them
 
-2026-08-20 13:45 (UTC+07:00) · reconstructed · 18 changes
+2026-08-20 13:39 (UTC+07:00) · reconstructed · 18 changes
 
 **Simulation**
 

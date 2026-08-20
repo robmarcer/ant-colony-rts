@@ -5,13 +5,15 @@
  *   npm run match -- --a rush --b boom --repeat 5          (seeds 1..5)
  *   npm run match -- --list
  */
-import { runMatch } from '../match/runner.js';
+import { NotReplayable, replayRecord, runMatch } from '../match/runner.js';
 import { runRoundRobin, runSeries } from '../match/tournament.js';
 import {
   ensureStarterDefinitions,
   listDefinitionIds,
+  listMatches,
   loadAllDefinitions,
   loadDefinition,
+  readMatch,
   saveMatch,
 } from '../match/store.js';
 import { DEFAULT_TIME_LIMIT_SECONDS } from '../sim/config.js';
@@ -40,6 +42,37 @@ function parseArgs(argv: string[]): Args {
 const args = parseArgs(process.argv.slice(2));
 const created = ensureStarterDefinitions();
 if (created.length) console.error(`wrote starter definitions: ${created.join(', ')}`);
+
+if (args.replay) {
+  const id = args.replay === true ? (listMatches({ limit: 1 })[0]?.id ?? '') : String(args.replay);
+  if (!id) {
+    console.error('no stored matches to replay');
+    process.exit(1);
+  }
+  try {
+    const { identical, replayed } = replayRecord(readMatch(id));
+    console.log(`replayed ${id}`);
+    console.log(`  recorded: ${JSON.stringify(readMatch(id).result)}`);
+    console.log(`  replayed: ${JSON.stringify(replayed.result)}`);
+    console.log(identical ? '  identical, the match reproduces exactly' : '  DIFFERENT, this is a determinism bug');
+    process.exit(identical ? 0 : 1);
+  } catch (error) {
+    if (error instanceof NotReplayable) {
+      console.error(`cannot replay: ${error.message}`);
+      process.exit(2);
+    }
+    throw error;
+  }
+}
+
+if (args.matches) {
+  for (const row of listMatches({ limit: Number(args.limit ?? 20) })) {
+    console.log(
+      `${row.replayable ? 'ok ' : 'stale'} ${String(row.appVersion ?? 'unversioned').padEnd(7)} ${row.id}`,
+    );
+  }
+  process.exit(0);
+}
 
 if (args.list) {
   for (const id of listDefinitionIds()) {

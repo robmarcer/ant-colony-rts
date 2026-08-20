@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_STRATEGY, PRESETS } from '../sim/strategy.js';
 import { parseDefinition, slugify, type BehaviourDefinition, type ValidationIssue } from '../sim/definition.js';
+import { isReplayable } from './runner.js';
 import type { MatchRecord, MatchSummaryRow } from './types.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,8 @@ export function saveMatch(record: MatchRecord): MatchRecord {
   const row: MatchSummaryRow = {
     id: record.id,
     createdAt: record.createdAt,
+    appVersion: record.appVersion,
+    balanceHash: record.balanceHash,
     seed: record.seed,
     a: record.colonies[0].definitionId,
     b: record.colonies[1].definitionId,
@@ -130,7 +133,12 @@ export function listMatches(query: ListMatchesQuery = {}): MatchSummaryRow[] {
     .map((line) => JSON.parse(line) as MatchSummaryRow)
     .reverse(); // newest first
   const filtered = query.definition ? rows.filter((r) => r.a === query.definition || r.b === query.definition) : rows;
-  return filtered.slice(0, query.limit ?? 50);
+  // Replayability is a statement about the code running now, so it is decided
+  // here rather than being trusted from the file.
+  return filtered.slice(0, query.limit ?? 50).map((row) => ({
+    ...row,
+    replayable: isReplayable({ appVersion: row.appVersion, balanceHash: row.balanceHash }),
+  }));
 }
 
 export class NotFound extends Error {}

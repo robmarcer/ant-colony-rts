@@ -5,13 +5,16 @@
  * Convention: add an entry here in the same change that alters behaviour, then
  * run `npm run changelog` to regenerate CHANGELOG.md. Newest entry first.
  *
- * On timestamps: entries marked 'commit' carry the time of a real git commit.
+ * On timestamps: entries marked 'commit' carry the author time of the real git
+ * commit the change landed in, read from git rather than typed by hand. Find the
+ * commit with `git log --grep '<version>'` or the version tag. Two entries share
+ * a timestamp when they landed in the same commit, which is the honest record.
+ *
  * Entries marked 'reconstructed' predate version control on this project. Their
- * times were derived from file modification times and the timestamps inside
- * saved match records, so they are accurate to the hour rather than the minute,
- * and their commit history does not exist. That distinction is recorded rather
- * than smoothed over, because a changelog that quietly invents precision is
- * worse than one that admits the gap.
+ * times come from file modification times, so they place the change to the
+ * minute the file was last written rather than to a commit that never existed.
+ * That distinction is recorded rather than smoothed over: a changelog which
+ * quietly invents precision is worse than one that admits the gap.
  */
 
 export type ChangeArea = 'sim' | 'ai' | 'balance' | 'perf' | 'api' | 'ui' | 'tests' | 'docs' | 'tooling';
@@ -36,8 +39,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.0',
+    timestamp: '2026-08-20T14:32:09+07:00',
+    title: 'Stored matches are pinned to the code that made them',
+    precision: 'commit',
+    changes: [
+      { area: 'api', detail: 'Match records carry appVersion and balanceHash, the latter a hash over every tunable value exported from src/sim/config.ts. Without them a stored match was only reproducible by accident: the six records already on disk were made on a 100x100 map with decaying 40% corpses and a 900 second limit, and replaying one under 0.6.0 silently produced a different game.', fix: true },
+      { area: 'api', detail: 'New POST /api/matches/:id/replay re-runs a stored match and reports whether it reproduced. Returns 409, naming both the recorded and running version and balance, when this build cannot reproduce it.' },
+      { area: 'api', detail: 'GET /api/matches marks every row replayable or not against the running build, decided at read time rather than trusted from the file. GET /api/health reports the balance hash alongside the version.' },
+      { area: 'tooling', detail: 'npm run match -- --replay [id] re-runs a stored match, defaulting to the newest, and exits 2 when the record cannot be reproduced. --matches lists stored records with their version and replay status.' },
+      { area: 'ui', detail: 'The past-match picker disables records this build cannot reproduce and says which version they need, instead of quietly replaying a different game.', fix: true },
+      { area: 'tests', detail: 'Six checks covering the round trip: a fresh record is stamped and replays exactly, and replay is refused for a mismatched app version, mismatched balance numbers, and a record from before stamping existed. Both halves of the stamp are tested separately so neither can quietly stop being load bearing.' },
+    ],
+  },
+  {
     version: '0.6.0',
-    timestamp: '2026-08-20T14:45:00+07:00',
+    timestamp: '2026-08-20T14:10:24+07:00',
     title: 'The map is a closed system',
     precision: 'commit',
     changes: [
@@ -52,7 +69,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.5.0',
-    timestamp: '2026-08-20T14:30:00+07:00',
+    timestamp: '2026-08-20T14:10:24+07:00',
     title: 'Default match length raised to 90,000 sim seconds',
     precision: 'commit',
     changes: [
@@ -63,9 +80,9 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.4.0',
-    timestamp: '2026-08-20T14:05:00+07:00',
+    timestamp: '2026-08-20T14:03:56+07:00',
     title: 'Changelog, app version and version control',
-    precision: 'reconstructed',
+    precision: 'commit',
     changes: [
       { area: 'ui', detail: 'Header shows the app version as a text link that opens the changelog. Deep link via the #changelog fragment.' },
       { area: 'ui', detail: 'In-app changelog view listing every release, its timestamp and the individual changes, grouped by area.' },
@@ -78,7 +95,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.3.0',
-    timestamp: '2026-08-20T13:50:00+07:00',
+    timestamp: '2026-08-20T13:50:05+07:00',
     title: 'Battlefields persist',
     precision: 'reconstructed',
     changes: [
@@ -91,7 +108,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.2.0',
-    timestamp: '2026-08-20T13:45:00+07:00',
+    timestamp: '2026-08-20T13:39:27+07:00',
     title: 'Queens found new nests, and a map with room for them',
     precision: 'reconstructed',
     changes: [
@@ -117,7 +134,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.1.0',
-    timestamp: '2026-08-20T12:43:00+07:00',
+    timestamp: '2026-08-20T12:43:24+07:00',
     title: 'Initial testbed',
     precision: 'reconstructed',
     changes: [

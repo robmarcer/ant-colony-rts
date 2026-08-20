@@ -45,6 +45,10 @@ export interface Battlefield {
 export interface MatchRecord {
   id: string;
   createdAt: string;
+  /** App version that produced this record. */
+  appVersion: string;
+  /** Hash of the balance numbers in src/sim/config.ts at the time. */
+  balanceHash: string;
   seed: string | number;
   seedHash: number;
   timeLimitSeconds: number;
@@ -72,6 +76,14 @@ export interface MatchRecord {
 export interface MatchSummaryRow {
   id: string;
   createdAt: string;
+  appVersion?: string;
+  balanceHash?: string;
+  /**
+   * Whether this record can still be reproduced by the running code. Computed
+   * when the row is read, not when it was written, since it is a statement
+   * about the code you are running now.
+   */
+  replayable?: boolean;
   seed: string | number;
   a: string;
   b: string;

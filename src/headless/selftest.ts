@@ -5,7 +5,8 @@
 import { Simulation } from '../sim/sim.js';
 import { parseDefinition } from '../sim/definition.js';
 import { PRESETS } from '../sim/strategy.js';
-import { runMatch } from '../match/runner.js';
+import { NotReplayable, isReplayable, replayRecord, runMatch } from '../match/runner.js';
+import { balanceFingerprint } from '../meta/fingerprint.js';
 import {
   CORPSE_VALUE_FRACTION,
   MAP_HEIGHT,
@@ -299,6 +300,52 @@ console.log('closed system');
       `drift ${(mid.totalEnergy() - before).toFixed(6)}`,
     );
   }
+}
+
+console.log('replay is version pinned');
+{
+  const record = runMatch({
+    definitions: [def('a', 'rush'), def('b', 'boom')],
+    seed: 'replay',
+    timeLimitSeconds: 600,
+  });
+  check('a fresh record is stamped with the app version', record.appVersion === APP_VERSION, String(record.appVersion));
+  check('a fresh record is stamped with the balance hash', record.balanceHash === balanceFingerprint(), String(record.balanceHash));
+  check('a fresh record is replayable', isReplayable(record));
+
+  const { identical } = replayRecord(record);
+  check('replaying a same-version record reproduces it exactly', identical);
+
+  // Both halves of the stamp must be load bearing, so test them separately.
+  const wrongVersion = { ...record, appVersion: '0.0.1' };
+  let refusedVersion = false;
+  try {
+    replayRecord(wrongVersion);
+  } catch (error) {
+    refusedVersion = error instanceof NotReplayable;
+  }
+  check('replaying a record from another app version is refused', refusedVersion);
+
+  const wrongBalance = { ...record, balanceHash: 'deadbeef' };
+  let refusedBalance = false;
+  try {
+    replayRecord(wrongBalance);
+  } catch (error) {
+    refusedBalance = error instanceof NotReplayable;
+  }
+  check('replaying a record made with different balance numbers is refused', refusedBalance);
+
+  const unstamped = { ...record };
+  delete (unstamped as { appVersion?: string }).appVersion;
+  delete (unstamped as { balanceHash?: string }).balanceHash;
+  let refusedUnstamped = false;
+  try {
+    replayRecord(unstamped as typeof record);
+  } catch (error) {
+    refusedUnstamped = error instanceof NotReplayable;
+  }
+  check('replaying a record from before version stamping is refused', refusedUnstamped);
+  check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
 }
 
 console.log('changelog');

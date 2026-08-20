@@ -4,6 +4,8 @@ import { hashSeed } from '../sim/rng.js';
 import type { BehaviourDefinition, ValidationIssue } from '../sim/definition.js';
 import type { ColonyId } from '../sim/types.js';
 import { describeStrategy } from '../sim/rules.js';
+import { APP_VERSION } from '../meta/changelog.js';
+import { balanceFingerprint } from '../meta/fingerprint.js';
 import type { Battlefield, ColonyStats, MatchRecord, RuleActivity } from './types.js';
 
 export interface RunMatchOptions {
@@ -48,6 +50,8 @@ export function runMatch(options: RunMatchOptions): MatchRecord {
   const record: MatchRecord = {
     id,
     createdAt,
+    appVersion: APP_VERSION,
+    balanceHash: balanceFingerprint(),
     seed,
     seedHash: hashSeed(seed),
     timeLimitSeconds,
@@ -69,6 +73,70 @@ export function runMatch(options: RunMatchOptions): MatchRecord {
   };
   record.digest = renderDigest(record, sim.series);
   return record;
+}
+
+/** Thrown when a stored match cannot be reproduced by the running code. */
+export class NotReplayable extends Error {
+  constructor(
+    readonly recordVersion: string | undefined,
+    readonly recordBalance: string | undefined,
+    readonly reason: string,
+  ) {
+    super(reason);
+    this.name = 'NotReplayable';
+  }
+}
+
+/**
+ * True if a stored record was produced by the code that is running now. Takes
+ * optionals because rows written before version stamping have neither field,
+ * and those are exactly the ones that must report false.
+ */
+export function isReplayable(record: { appVersion?: string; balanceHash?: string }): boolean {
+  return record.appVersion === APP_VERSION && record.balanceHash === balanceFingerprint();
+}
+
+/**
+ * Re-run a stored match and compare. Refuses rather than silently producing a
+ * different game: a record is only reproducible under the code version and
+ * balance numbers that made it.
+ */
+export function replayRecord(record: MatchRecord): { identical: boolean; replayed: MatchRecord } {
+  if (record.appVersion === undefined || record.balanceHash === undefined) {
+    throw new NotReplayable(
+      record.appVersion,
+      record.balanceHash,
+      `match ${record.id} predates version stamping, so there is no way to know which code produced it. ` +
+        `Running code is ${APP_VERSION} with balance ${balanceFingerprint()}.`,
+    );
+  }
+  if (!isReplayable(record)) {
+    const parts: string[] = [];
+    if (record.appVersion !== APP_VERSION) parts.push(`recorded under app ${record.appVersion}, running ${APP_VERSION}`);
+    if (record.balanceHash !== balanceFingerprint()) {
+      parts.push(`balance numbers differ (recorded ${record.balanceHash}, running ${balanceFingerprint()})`);
+    }
+    throw new NotReplayable(
+      record.appVersion,
+      record.balanceHash,
+      `match ${record.id} cannot be reproduced by this build: ${parts.join('; ')}. ` +
+        'Re-running it would produce a different game, not the recorded one.',
+    );
+  }
+
+  const replayed = runMatch({
+    definitions: record.definitions,
+    definitionIssues: record.definitionIssues,
+    seed: record.seed,
+    timeLimitSeconds: record.timeLimitSeconds,
+    id: `${record.id}_replay`,
+  });
+  // Compare on outcome and the full time series rather than the id or the
+  // wall-clock timestamp, which are expected to differ.
+  const identical =
+    JSON.stringify({ r: record.result, s: record.series, c: record.colonies }) ===
+    JSON.stringify({ r: replayed.result, s: replayed.series, c: replayed.colonies });
+  return { identical, replayed };
 }
 
 function battlefieldOf(sim: Simulation): Battlefield {

@@ -34,7 +34,8 @@ import {
   UNIT_STATS,
 } from '../src/sim/config.js';
 import { APP_VERSION, CHANGELOG, totalChanges } from '../src/meta/changelog.js';
-import { runMatch } from '../src/match/runner.js';
+import { NotReplayable, isReplayable, replayRecord, runMatch } from '../src/match/runner.js';
+import { balanceFingerprint } from '../src/meta/fingerprint.js';
 import { runRoundRobin, runSeries } from '../src/match/tournament.js';
 import {
   NotFound,
@@ -91,6 +92,7 @@ app.get('/api', (_req, res) => {
       'GET /api/matches': 'list past matches, newest first: ?limit=&definition=',
       'GET /api/matches/:id': 'full match record, or ?view=digest for plain text',
       'GET /api/matches/:id/events': 'match event log, ?major=true for the timeline only',
+      'POST /api/matches/:id/replay': 're-run a stored match and confirm it reproduces; 409 if this build cannot reproduce it',
       'POST /api/series': 'run the same pairing over several seeds: {a, b, seeds?, swapSides?}',
       'POST /api/round-robin': 'run every pairing: {definitions?, seeds?}',
       'GET /api/stats/:id': 'aggregate win/loss record for one definition across saved matches',
@@ -99,7 +101,12 @@ app.get('/api', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, version: APP_VERSION, definitions: listDefinitionIds().length }),
+  res.json({
+    ok: true,
+    version: APP_VERSION,
+    balanceHash: balanceFingerprint(),
+    definitions: listDefinitionIds().length,
+  }),
 );
 
 app.get('/api/changelog', (_req, res) => {
@@ -277,6 +284,19 @@ app.get('/api/matches', handler((req, res) => {
   );
 }));
 
+app.post('/api/matches/:id/replay', handler((req, res) => {
+  const record = readMatch(String(req.params.id));
+  const { identical, replayed } = replayRecord(record);
+  res.json({
+    id: record.id,
+    identical,
+    appVersion: record.appVersion,
+    balanceHash: record.balanceHash,
+    original: record.result,
+    replayed: replayed.result,
+  });
+}));
+
 app.get('/api/matches/:id', handler((req, res) => {
   const record = readMatch(String(req.params.id));
   if (req.query.view === 'digest') {
@@ -285,10 +305,10 @@ app.get('/api/matches/:id', handler((req, res) => {
   }
   if (req.query.view === 'summary') {
     const { events, series, ...rest } = record;
-    res.json(rest);
+    res.json({ ...rest, replayable: isReplayable(record) });
     return;
   }
-  res.json(record);
+  res.json({ ...record, replayable: isReplayable(record) });
 }));
 
 app.get('/api/matches/:id/events', handler((req, res) => {
@@ -404,6 +424,18 @@ app.get('/api/stats/:id', handler((req, res) => {
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof NotFound) {
     res.status(404).json({ error: error.message });
+    return;
+  }
+  if (error instanceof NotReplayable) {
+    // 409: the request is well formed, the stored state just conflicts with
+    // what this build can reproduce.
+    res.status(409).json({
+      error: error.message,
+      recordedVersion: error.recordVersion ?? null,
+      recordedBalance: error.recordBalance ?? null,
+      runningVersion: APP_VERSION,
+      runningBalance: balanceFingerprint(),
+    });
     return;
   }
   if (error instanceof SyntaxError) {
