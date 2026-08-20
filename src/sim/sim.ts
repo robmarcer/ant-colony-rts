@@ -25,7 +25,7 @@ import { HOME_NEST_POSITIONS, generateFood } from './world.js';
 import { PRESETS, type StrategyConfig } from './strategy.js';
 import { RULE_EVAL_INTERVAL_SECONDS, parseDefinition, type BehaviourDefinition } from './definition.js';
 import { computeMetrics, describeStrategy, evaluateRules, type Metrics } from './rules.js';
-import { runColonyProduction, runUnitAi } from './ai.js';
+import { runColonyProduction, runRecycling, runUnitAi } from './ai.js';
 import type {
   Colony,
   ColonyId,
@@ -161,6 +161,7 @@ export class Simulation {
       knownFood: new Map(),
       unitsProduced: { queen: 1, worker: STARTING_WORKERS, soldier: 0 },
       nestsFounded: 0,
+      unitsRecycled: { queen: 0, worker: 0, soldier: 0 },
       queensLostInTransit: 0,
       unitsLost: { queen: 0, worker: 0, soldier: 0 },
       recentLosses: 0,
@@ -346,6 +347,7 @@ export class Simulation {
       nestId: null,
       build: null,
       guardFoodId: null,
+      recycling: false,
     };
     this.units.set(unit.id, unit);
     return unit;
@@ -545,6 +547,7 @@ export class Simulation {
 
     if (this.tick % Math.round(RULE_EVAL_INTERVAL_SECONDS * TICKS_PER_SECOND) === 0) {
       this.evaluateBehaviour();
+      for (const colony of this.colonies) runRecycling(this, colony);
     }
 
     for (const colony of this.colonies) {
@@ -797,6 +800,23 @@ export class Simulation {
   }
 
   // --------------------------------------------------------------- deposit hook
+
+  /**
+   * A queen consumes one of her own units. Its full food cost, plus anything it
+   * was carrying, goes straight back to the stockpile, so the map stays a closed
+   * system and this is a conversion rather than a loss. It is not a death: no
+   * corpse, no kill for the enemy, and it is not counted as a loss.
+   */
+  recycleUnit(unit: Unit): void {
+    const colony = this.colonies[unit.owner];
+    colony.food += UNIT_STATS[unit.type].cost + unit.carrying;
+    colony.unitsRecycled[unit.type]++;
+    this.units.delete(unit.id);
+    for (const other of this.units.values()) {
+      if (other.targetEnemyId === unit.id) other.targetEnemyId = null;
+    }
+    this.rebuildRoster();
+  }
 
   /**
    * Called by ai.ts when a hauling worker reaches a nest. The stockpile is

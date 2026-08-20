@@ -79,7 +79,7 @@ and in the match record. Invalid numbers are clamped rather than rejected.
 Nothing else changes a colony's knobs during a match. There is no operator, no
 override, no external call.
 
-## The seven knobs
+## The eight knobs
 
 ### unit_production_ratio
 
@@ -203,6 +203,36 @@ A colony at its population ceiling will still build a queen if `target_nests`
 calls for one, since expanding is the only way to raise the ceiling. Losing a
 queen destroys her nest but not the colony: you are only eliminated when your
 last queen dies.
+
+### recycle_surplus
+
+Sends surplus units home to be eaten by a queen. Their full food cost, plus
+anything they were carrying, goes straight back to the stockpile, so this is a
+conversion rather than a loss: no corpse, no kill for the enemy, and it does not
+count against you as a casualty. The map stays a closed system.
+
+0 never recycles, which is the default and what every existing definition does.
+1 recalls roughly four units a second. The knob is a rate, not a switch.
+
+Two conditions, both deliberate:
+
+- It only fires at or above 90% of your population ceiling. With room to spare,
+  building the type you want is strictly better than culling to make space for
+  it, since culling throws away build time you already spent. Recycling is the
+  right move only when you have no room, which is precisely when you cannot
+  build your way out.
+- It never culls workers below `min_worker_reserve`. That floor still binds.
+
+What it is for: `unit_production_ratio` only governs what you build *next*, so a
+colony that spends five minutes on workers and then decides it needs an army
+carries those workers for the rest of the match. Recycling lets a rule reshape
+the army that already exists. Measured on a definition that booms on workers and
+pivots to 40/60 at 300 seconds, from one nest: without recycling it finishes on
+63 workers and 37 soldiers, with it, 37 and 52.
+
+A quirk worth knowing: a lower value can recycle *more* in total, because a
+slower rate keeps the colony above the pressure threshold for longer and so keeps
+triggering. At 0.5 the same definition recycled 25 workers, at 1.0 only 20.
 
 ### risk_tolerance
 

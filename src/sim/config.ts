@@ -159,6 +159,26 @@ export const MAX_NESTS_PER_COLONY = 6;
  * slot and the shorter haul, rather than because of a headcount.
  */
 export const UNITS_PER_NEST = 100;
+/**
+ * Recycling only happens under population pressure, at or above this fraction of
+ * the ceiling.
+ *
+ * Below the ceiling, converting workers into soldiers by culling them is
+ * strictly worse than just building soldiers: you throw away the build time
+ * already spent. Recycling is only the right move when you cannot build what you
+ * want because you have no room, which is exactly the situation this gates on.
+ * It also stops the knob being a footgun early on, when a colony of five workers
+ * would otherwise cull itself to hit a 50/50 target.
+ */
+export const RECYCLE_PRESSURE_FRACTION = 0.9;
+/** How far composition must be off target before anything is culled. */
+export const RECYCLE_TOLERANCE_FRACTION = 0.05;
+/**
+ * Units sent to be recycled per decision at recycle_surplus 1.0, scaled down by
+ * the knob. This is what stops a colony mass culling itself in one second, and
+ * it is why the knob reads as a rate rather than a switch.
+ */
+export const RECYCLE_MAX_PER_DECISION = 4;
 export const DEPOSIT_RADIUS = 2.5;
 /** Fraction of max hp regenerated per second while inside your own nest. */
 export const NEST_REGEN_PER_SECOND = 0.03;

@@ -24,6 +24,9 @@ import {
   MIN_ENEMY_NEST_DISTANCE,
   MIN_NEST_SEPARATION,
   NEST_RADIUS,
+  RECYCLE_MAX_PER_DECISION,
+  RECYCLE_PRESSURE_FRACTION,
+  RECYCLE_TOLERANCE_FRACTION,
   UNITS_PER_NEST,
   UNIT_STATS,
 } from './config.js';
@@ -32,6 +35,7 @@ import type { Colony, Nest, Unit, UnitType, Vec } from './types.js';
 import type { Simulation } from './sim.js';
 
 export function runUnitAi(sim: Simulation, unit: Unit): void {
+  if (unit.type !== 'queen' && handleRecycling(sim, unit)) return;
   switch (unit.type) {
     case 'queen':
       return queenAi(sim, unit);
@@ -52,6 +56,94 @@ export function runUnitAi(sim: Simulation, unit: Unit): void {
  * Queens are processed in id order, so when two of them could afford the same
  * unit in the same tick the outcome is deterministic.
  */
+/**
+ * Decide whether to send surplus units home to be eaten, so the army the colony
+ * already has can be reshaped rather than only the army it builds next.
+ *
+ * Gated on population pressure: with room to spare, building the type you want
+ * beats culling to make space for it, since culling throws away build time
+ * already spent. Called on the same interval as rule evaluation rather than
+ * every tick.
+ */
+export function runRecycling(sim: Simulation, colony: Colony): void {
+  const strategy = colony.strategy;
+  if (strategy.recycle_surplus <= 0) return;
+  if (colony.nests.length === 0) return;
+
+  const workers = sim.countUnits(colony.id, 'worker');
+  const soldiers = sim.countUnits(colony.id, 'soldier');
+  const population = workers + soldiers;
+  const capacity = colony.nests.length * UNITS_PER_NEST;
+  if (population < capacity * RECYCLE_PRESSURE_FRACTION) return;
+
+  const tolerance = Math.max(1, population * RECYCLE_TOLERANCE_FRACTION);
+  const targetWorkers = population * strategy.unit_production_ratio.worker;
+
+  let type: 'worker' | 'soldier';
+  let surplus: number;
+  if (workers - targetWorkers > tolerance) {
+    type = 'worker';
+    surplus = workers - targetWorkers - tolerance;
+    // Never cull below the worker floor the strategy itself asked for.
+    surplus = Math.min(surplus, Math.max(0, workers - strategy.min_worker_reserve));
+  } else if (targetWorkers - workers > tolerance) {
+    type = 'soldier';
+    surplus = targetWorkers - workers - tolerance;
+  } else {
+    return;
+  }
+
+  // The knob sets the rate, not just the switch. A flat cap scaled by nothing
+  // made 0.5 and 1.0 behave identically, since any real surplus saturated it.
+  const perDecision = Math.max(1, Math.round(RECYCLE_MAX_PER_DECISION * strategy.recycle_surplus));
+  const wanted = Math.min(perDecision, Math.floor(surplus));
+  if (wanted <= 0) return;
+
+  // Take the ones already closest to a nest: they are the cheapest to recall and
+  // spend the least time walking instead of working.
+  const candidates = sim
+    .unitsOf(colony.id)
+    .filter((unit) => unit.type === type && !unit.recycling)
+    .map((unit) => ({ unit, distance: sim.distanceToNearestNest(colony.id, unit) }))
+    .sort((a, b) => a.distance - b.distance || a.unit.id - b.unit.id)
+    .slice(0, wanted);
+
+  for (const { unit } of candidates) {
+    unit.recycling = true;
+    unit.targetFoodId = null;
+    unit.targetEnemyId = null;
+    unit.guardFoodId = null;
+    unit.state = 'recycling';
+  }
+  if (candidates.length > 0) {
+    sim.pushEvent(
+      'recycled',
+      colony.id,
+      `${colony.name} is recycling ${candidates.length} ${type}${candidates.length === 1 ? '' : 's'} at its population ceiling`,
+      true,
+    );
+  }
+}
+
+/**
+ * Walk home and be consumed. Returns true when the unit handled this tick, so
+ * the normal AI is skipped.
+ */
+function handleRecycling(sim: Simulation, unit: Unit): boolean {
+  if (!unit.recycling) return false;
+  const home = sim.nearestNest(unit.owner, unit);
+  if (!home) {
+    // Nowhere left to go home to, so carry on being useful instead.
+    unit.recycling = false;
+    return false;
+  }
+  unit.state = 'recycling';
+  if (moveToward(unit, home, UNIT_STATS[unit.type].speed) || sim.atNest(unit)) {
+    sim.recycleUnit(unit);
+  }
+  return true;
+}
+
 export function runColonyProduction(sim: Simulation, colony: Colony): void {
   for (const queen of sim.queensOf(colony.id)) {
     // A queen walking to a founding site is not producing anything.

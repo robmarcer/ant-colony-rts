@@ -13,7 +13,8 @@ export type UnitState =
   | 'retreating'  // hurt, heading home to regen
   | 'scouting'    // heading to an unexplored point
   | 'guarding'    // soldier holding position near a nest
-  | 'founding';   // new queen walking to a site to start a nest
+  | 'founding'    // new queen walking to a site to start a nest
+  | 'recycling';  // heading home to be consumed by a queen
 
 export interface Vec {
   x: number;
@@ -55,6 +56,8 @@ export interface Unit {
    * to have the most enemy workers that instant and never actually hold one.
    */
   guardFoodId: number | null;
+  /** Marked for recycling: walk home and be consumed, freeing population room. */
+  recycling: boolean;
 }
 
 /**
@@ -127,6 +130,8 @@ export interface Colony {
   knownFood: Map<number, KnownFood>;
   unitsProduced: Record<UnitType, number>;
   nestsFounded: number;
+  /** Own units consumed by a queen to change the army's composition. */
+  unitsRecycled: Record<UnitType, number>;
   /** Queens killed while walking to a site, i.e. expansions that never landed. */
   queensLostInTransit: number;
   unitsLost: Record<UnitType, number>;
@@ -151,6 +156,7 @@ export type MatchEventType =
   | 'nest_under_attack'
   | 'starving'
   | 'stalemate'
+  | 'recycled'
   | 'match_end';
 
 export interface MatchEvent {

@@ -118,6 +118,7 @@ const KNOB_KEYS = new Set([
   'soldier_posture',
   'risk_tolerance',
   'target_nests',
+  'recycle_surplus',
 ]);
 
 export function slugify(input: string): string {
@@ -277,6 +278,7 @@ export const DEFINITION_DOC = {
     soldier_posture: SOLDIER_POSTURES,
     risk_tolerance: 'number 0..1',
     target_nests: 'integer 1..6',
+    recycle_surplus: 'number 0..1',
   },
   rule_metrics: RULE_METRICS,
   rule_ops: RULE_OPS,

@@ -39,6 +39,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.13.0',
+    timestamp: '2026-08-20T15:40:01+07:00',
+    title: 'Colonies can recycle their own units',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'New eighth knob recycle_surplus: workers and soldiers walk home and are consumed by a queen, returning their full food cost and anything they carried to the stockpile. This is a conversion, not a death: no corpse, no kill for the enemy, and it is not booked as a loss. The map stays a closed system, asserted to zero drift.' },
+      { area: 'sim', detail: 'The point is that unit_production_ratio only governs what you build next. A colony that booms on workers then decides it needs an army used to carry those workers for the rest of the match. Measured on a definition that pivots to 40/60 at 300 seconds from one nest: 63 workers and 37 soldiers without recycling, 37 and 52 with it.' },
+      { area: 'sim', detail: 'Two guards. It only fires at or above 90% of the population ceiling, because with room to spare, building the type you want beats culling to make space for it, and without that gate a colony of five workers would cull itself to hit a 50/50 target. And it never culls below min_worker_reserve.' },
+      { area: 'balance', detail: 'The knob is a rate rather than a switch, recalling up to four units a second at 1.0. A first version used a flat cap, which made 0.5 and 1.0 behave identically because any real surplus saturated it.', fix: true },
+      { area: 'balance', detail: 'A quirk worth knowing: a lower value can recycle more in total, because a slower rate keeps the colony above the pressure threshold for longer and so keeps triggering. 0.5 recycled 25 workers where 1.0 recycled 20.' },
+      { area: 'docs', detail: 'preset-boom and preset-blockade, which both sit at their ceiling, ship with 0.5. example-adaptive gains a worked rule that turns recycling on when the enemy masses soldiers, held for 120 seconds.' },
+      { area: 'tests', detail: 'Thirteen checks. Three of my first attempts asserted the wrong thing and were rewritten: two inferred "recycling is not a combat loss" from a match that had real combat losses, and one asserted the worker floor holds when combat attrition can breach it independently of recycling. The invariants are now tested directly against recycleUnit.' },
+    ],
+  },
+  {
     version: '0.12.0',
     timestamp: '2026-08-20T15:32:32+07:00',
     title: 'Killing a queen is a siege',

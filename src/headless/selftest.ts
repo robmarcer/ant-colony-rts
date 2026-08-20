@@ -313,6 +313,132 @@ console.log('closed system');
   }
 }
 
+console.log('recycling units');
+{
+  const pivot = (recycle: number) =>
+    parse(
+      {
+        id: 'pivot',
+        name: 'pivot',
+        base: {
+          ...PRESETS.boom,
+          target_nests: 1,
+          recycle_surplus: recycle,
+          unit_production_ratio: { worker: 0.95, soldier: 0.05 },
+        },
+        rules: [
+          {
+            id: 'to-war',
+            when: [{ metric: 'sim_seconds', op: 'gte', value: 300 }],
+            set: { unit_production_ratio: { worker: 0.4, soldier: 0.6 } },
+          },
+        ],
+      },
+      'pivot',
+    ).definition;
+
+  const run = (recycle: number) => {
+    const sim = new Simulation({
+      seed: '1',
+      timeLimitSeconds: 900,
+      definitions: [pivot(recycle), def('o', 'turtle')],
+    });
+    const startEnergy = sim.totalEnergy();
+    let worstDrift = 0;
+    for (let i = 0; i < 90 && !sim.finished; i++) {
+      sim.run(100);
+      worstDrift = Math.max(worstDrift, Math.abs(sim.totalEnergy() - startEnergy));
+    }
+    return {
+      workers: sim.countUnits(0, 'worker'),
+      soldiers: sim.countUnits(0, 'soldier'),
+      recycled: sim.colonies[0].unitsRecycled.worker,
+      lost: sim.colonies[0].unitsLost.worker,
+      enemyKills: sim.colonies[1].kills,
+      worstDrift,
+      events: sim.events.filter((e) => e.type === 'recycled').length,
+    };
+  };
+
+  const off = run(0);
+  const on = run(1);
+
+  check('recycling is off by default', off.recycled === 0, `${off.recycled} recycled`);
+  check('recycling culls surplus workers once turned on', on.recycled > 0, `${on.recycled} recycled`);
+  check(
+    'recycling reshapes the live army, not just future builds',
+    on.soldiers > off.soldiers && on.workers < off.workers,
+    `on ${on.workers}w/${on.soldiers}s vs off ${off.workers}w/${off.soldiers}s`,
+  );
+  check('energy is conserved through recycling', on.worstDrift < 1e-6, `drift ${on.worstDrift.toExponential(2)}`);
+  check('recycling is logged', on.events > 0);
+
+  // Tested directly rather than inferred from a full match: a match against a
+  // live opponent has real combat losses, which say nothing about whether
+  // recycling is booking itself as one.
+  const direct = new Simulation({ seed: 'direct', timeLimitSeconds: 300, definitions: [def('a', 'boom'), def('b', 'boom')] });
+  direct.run(600);
+  const victim = direct.unitsOf(0).find((u) => u.type === 'worker')!;
+  const foodBefore = direct.colonies[0].food;
+  const lostBefore = direct.colonies[0].unitsLost.worker;
+  const killsBefore = direct.colonies[1].kills;
+  const corpsesBefore = [...direct.food.values()].filter((f) => f.kind === 'corpse').length;
+  const energyBefore = direct.totalEnergy();
+  const carried = victim.carrying;
+  direct.recycleUnit(victim);
+  check(
+    'recycling returns the unit cost and its load to the stockpile',
+    Math.abs(direct.colonies[0].food - (foodBefore + UNIT_STATS.worker.cost + carried)) < 1e-9,
+    `${direct.colonies[0].food.toFixed(2)} from ${foodBefore.toFixed(2)}`,
+  );
+  check('recycling conserves energy exactly', Math.abs(direct.totalEnergy() - energyBefore) < 1e-9);
+  check('a recycled unit is not a combat loss', direct.colonies[0].unitsLost.worker === lostBefore);
+  check('a recycled unit gives the enemy no kill', direct.colonies[1].kills === killsBefore);
+  check(
+    'a recycled unit leaves no corpse',
+    [...direct.food.values()].filter((f) => f.kind === 'corpse').length === corpsesBefore,
+  );
+  check('a recycled unit is gone', !direct.units.has(victim.id));
+
+  // Below the population ceiling there is nothing to gain, so nothing happens.
+  const roomy = new Simulation({
+    seed: '1',
+    timeLimitSeconds: 300,
+    definitions: [pivot(1), def('o', 'turtle')],
+  });
+  roomy.run(3001);
+  check(
+    'no recycling while there is room to just build instead',
+    roomy.colonies[0].unitsRecycled.worker === 0,
+    `${roomy.colonies[0].unitsRecycled.worker} recycled at ${roomy.countUnits(0, 'worker') + roomy.countUnits(0, 'soldier')} population`,
+  );
+
+  const floored = parse(
+    {
+      id: 'floored',
+      name: 'floored',
+      base: {
+        ...PRESETS.boom,
+        target_nests: 1,
+        recycle_surplus: 1,
+        min_worker_reserve: 95,
+        unit_production_ratio: { worker: 0.1, soldier: 0.9 },
+      },
+      rules: [],
+    },
+    'floored',
+  ).definition;
+  const guarded = new Simulation({ seed: '1', timeLimitSeconds: 900, definitions: [floored, def('o', 'turtle')] });
+  guarded.run(9001);
+  // The floor can still be breached by combat attrition, which is not
+  // recycling's doing, so the assertion is that recycling itself culled nothing.
+  check(
+    'recycling never culls below min_worker_reserve',
+    guarded.colonies[0].unitsRecycled.worker === 0,
+    `${guarded.colonies[0].unitsRecycled.worker} recycled with ${guarded.countUnits(0, 'worker')} workers against a floor of 95`,
+  );
+}
+
 console.log('killing a queen is a siege');
 {
   const sim = new Simulation({ seed: 'siege', timeLimitSeconds: 900, definitions: [def('a', 'boom'), def('b', 'boom')] });

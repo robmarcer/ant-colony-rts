@@ -43,6 +43,14 @@ export interface StrategyConfig {
    * economic gamble in the game.
    */
   target_nests: number;
+  /**
+   * Willingness to send surplus units home to be consumed by a queen, so the
+   * live composition can be changed rather than only the composition of future
+   * builds. 0 never recycles, 1 culls the whole surplus at once.
+   *
+   * Only applies under population pressure: see RECYCLE_PRESSURE_FRACTION.
+   */
+  recycle_surplus: number;
 }
 
 export const DEFAULT_STRATEGY: StrategyConfig = {
@@ -53,6 +61,7 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   soldier_posture: 'defend_nest',
   risk_tolerance: 0.4,
   target_nests: 2,
+  recycle_surplus: 0,
 };
 
 /** Hand written strategies, used for LLM-free matches and as a baseline. */
@@ -66,6 +75,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'defend_nest',
     risk_tolerance: 0.2,
     target_nests: 4,
+    recycle_surplus: 0.5,
   },
   rush: {
     unit_production_ratio: { worker: 0.35, soldier: 0.65 },
@@ -75,6 +85,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'attack_enemy_nest',
     risk_tolerance: 0.9,
     target_nests: 1,
+    recycle_surplus: 0,
   },
   harass: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -86,6 +97,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'harass_enemy_workers',
     risk_tolerance: 0.6,
     target_nests: 2,
+    recycle_surplus: 0,
   },
   turtle: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -95,6 +107,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'defend_nest',
     risk_tolerance: 0.15,
     target_nests: 1,
+    recycle_surplus: 0,
   },
   blockade: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -104,6 +117,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'guard_food',
     risk_tolerance: 0.5,
     target_nests: 2,
+    recycle_surplus: 0.5,
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -113,6 +127,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'escort_workers',
     risk_tolerance: 0.5,
     target_nests: 3,
+    recycle_surplus: 0,
   },
 };
 
@@ -180,6 +195,7 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
       target_nests: Math.round(
         numberOr(input.target_nests, 'target_nests', 1, MAX_NESTS_PER_COLONY, fallback.target_nests),
       ),
+      recycle_surplus: numberOr(input.recycle_surplus, 'recycle_surplus', 0, 1, fallback.recycle_surplus),
     },
     warnings,
   };
@@ -246,5 +262,6 @@ export const STRATEGY_JSON_SCHEMA = {
     'soldier_posture',
     'risk_tolerance',
     'target_nests',
+    'recycle_surplus',
   ],
 } as const;

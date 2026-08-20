@@ -14,7 +14,8 @@
     "min_worker_reserve": 12,
     "soldier_posture": "defend_nest",
     "risk_tolerance": 0.3,
-    "target_nests": 2
+    "target_nests": 2,
+    "recycle_surplus": 0
   },
   "rules": [
     {
@@ -49,6 +50,30 @@
       "set": {
         "target_nests": 1
       }
+    },
+    {
+      "id": "reshape-at-the-ceiling",
+      "note": "at the population ceiling the only way to get soldiers is to eat some workers",
+      "when": [
+        {
+          "metric": "my_workers",
+          "op": "gte",
+          "value": 60
+        },
+        {
+          "metric": "enemy_soldiers",
+          "op": "gte",
+          "value": 15
+        }
+      ],
+      "set": {
+        "recycle_surplus": 0.5,
+        "unit_production_ratio": {
+          "worker": 0.5,
+          "soldier": 0.5
+        }
+      },
+      "min_hold_seconds": 120
     },
     {
       "id": "midgame-army",
@@ -126,5 +151,5 @@
       }
     }
   ],
-  "updatedAt": "2026-08-20T06:33:35.328Z"
+  "updatedAt": "2026-08-20T08:35:47.793Z"
 }

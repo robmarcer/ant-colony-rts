@@ -1,10 +1,33 @@
 # Changelog
 
-Current version: **0.12.0**. 12 releases, 87 recorded changes.
+Current version: **0.13.0**. 13 releases, 94 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.13.0 — Colonies can recycle their own units
+
+2026-08-20 15:40 (UTC+07:00) · committed · 7 changes
+
+**Simulation**
+
+- New eighth knob recycle_surplus: workers and soldiers walk home and are consumed by a queen, returning their full food cost and anything they carried to the stockpile. This is a conversion, not a death: no corpse, no kill for the enemy, and it is not booked as a loss. The map stays a closed system, asserted to zero drift.
+- The point is that unit_production_ratio only governs what you build next. A colony that booms on workers then decides it needs an army used to carry those workers for the rest of the match. Measured on a definition that pivots to 40/60 at 300 seconds from one nest: 63 workers and 37 soldiers without recycling, 37 and 52 with it.
+- Two guards. It only fires at or above 90% of the population ceiling, because with room to spare, building the type you want beats culling to make space for it, and without that gate a colony of five workers would cull itself to hit a 50/50 target. And it never culls below min_worker_reserve.
+
+**Balance**
+
+- Fix: The knob is a rate rather than a switch, recalling up to four units a second at 1.0. A first version used a flat cap, which made 0.5 and 1.0 behave identically because any real surplus saturated it.
+- A quirk worth knowing: a lower value can recycle more in total, because a slower rate keeps the colony above the pressure threshold for longer and so keeps triggering. 0.5 recycled 25 workers where 1.0 recycled 20.
+
+**Tests**
+
+- Thirteen checks. Three of my first attempts asserted the wrong thing and were rewritten: two inferred "recycling is not a combat loss" from a match that had real combat losses, and one asserted the worker floor holds when combat attrition can breach it independently of recycling. The invariants are now tested directly against recycleUnit.
+
+**Docs**
+
+- preset-boom and preset-blockade, which both sit at their ceiling, ship with 0.5. example-adaptive gains a worked rule that turns recycling on when the enemy masses soldiers, held for 120 seconds.
 
 ## 0.12.0 — Killing a queen is a siege
 

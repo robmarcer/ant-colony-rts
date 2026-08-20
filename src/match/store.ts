@@ -193,6 +193,16 @@ export function ensureStarterDefinitions(): string[] {
         set: { target_nests: 1 },
       },
       {
+        id: 'reshape-at-the-ceiling',
+        note: 'at the population ceiling the only way to get soldiers is to eat some workers',
+        when: [
+          { metric: 'my_workers', op: 'gte', value: 60 },
+          { metric: 'enemy_soldiers', op: 'gte', value: 15 },
+        ],
+        set: { recycle_surplus: 0.5, unit_production_ratio: { worker: 0.5, soldier: 0.5 } },
+        min_hold_seconds: 120,
+      },
+      {
         id: 'midgame-army',
         note: 'after two minutes the easy food is thinning out, start building an army',
         when: [{ metric: 'sim_seconds', op: 'gte', value: 120 }],

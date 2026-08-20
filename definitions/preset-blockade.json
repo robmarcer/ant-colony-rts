@@ -14,8 +14,9 @@
     "min_worker_reserve": 12,
     "soldier_posture": "guard_food",
     "risk_tolerance": 0.5,
-    "target_nests": 2
+    "target_nests": 2,
+    "recycle_surplus": 0.5
   },
   "rules": [],
-  "updatedAt": "2026-08-20T07:53:33.051Z"
+  "updatedAt": "2026-08-20T08:35:47.792Z"
 }

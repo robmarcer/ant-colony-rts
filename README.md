@@ -109,10 +109,10 @@ declarative data, evaluated once per sim second inside the simulation, so the
 match stays deterministic and every activation is logged. Nothing is executed as
 code.
 
-The seven knobs are `unit_production_ratio`, `aggression`, `expansion_priority`,
-`min_worker_reserve`, `soldier_posture`, `risk_tolerance` and `target_nests`.
-Keeping the surface small is what makes two models comparable: they are filling
-in the same form.
+The eight knobs are `unit_production_ratio`, `aggression`, `expansion_priority`,
+`min_worker_reserve`, `soldier_posture`, `risk_tolerance`, `target_nests` and
+`recycle_surplus`. Keeping the surface small is what makes two models comparable:
+they are filling in the same form.
 
 Starter definitions are written to `definitions/` on first run.
 `example-mass-rush` and `example-adaptive` are the worked examples; the
@@ -157,6 +157,18 @@ how close to the enemy you will settle.
 - Corpses never decay, and one landing within 6 cells of an existing pile merges
   into it. Ground that has been fought over accumulates permanently, so an old
   battlefield is territory worth holding.
+
+## Recycling
+
+`unit_production_ratio` only governs what a colony builds next, so one that spends
+five minutes on workers and then wants an army is stuck carrying those workers.
+`recycle_surplus` lets it send them home to be eaten by a queen instead, returning
+their full cost to the stockpile.
+
+It only applies at or above 90% of the population ceiling, because with room to
+spare, building the type you want beats culling to make space for it. It never
+culls below `min_worker_reserve`, it leaves no corpse, and it counts as neither a
+loss for you nor a kill for the enemy.
 
 ## The map is a closed system
 
@@ -316,7 +328,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 93 properties, including:
+`npm run selftest` asserts 106 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk
@@ -333,7 +345,10 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - corpses do not decay, nearby ones merge into a single pile, distant ones do
   not, and a fought-over match leaves piles worth more than a worker can carry
 - energy is conserved: total energy on the map does not drift across a whole
-  match, including when a queen dies part way through building a unit
+  match, including when a queen dies part way through building a unit and when
+  units are recycled
+- recycling reshapes the live army, respects the worker floor, does nothing below
+  the population ceiling, and books neither a loss nor a kill
 - stored matches are pinned to the code that made them, and replay is refused
   for a mismatched version, mismatched balance numbers, or a missing stamp
 - a stalemated match ends early while a decisive one is untouched
