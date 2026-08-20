@@ -322,18 +322,20 @@ The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
 matches are not degenerate. Current state, measured over a round robin of the
 starter definitions across two seeds (112 matches):
 
-- 22% of matches were decided by eliminating a colony, the rest on score at the
-  time limit. That figure was 36% before sieges were introduced.
-- Win rates spread from 3% to 88% across nine definitions.
+- Win rates spread from 0% to 94% across ten definitions, on the ladder over 180
+  comparable matches.
+- The strongest definition is `claude-v1`, written by a model reading
+  `docs/agent-brief.md` and the ladder, at 2052.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
 - Every strategy above 60% expands. The two one-nest presets sit at 28% and 16%.
 - Area denial is strong: preset-blockade, which does nothing but post soldiers on
   food, is second at 81%.
-- Since sieges were introduced, economy and denial lead the field and committed
-  aggression is mid-table. preset-boom 88%, preset-blockade 81%,
-  example-adaptive 75%, preset-scout 63%, example-mass-rush 50%.
+- Food types shifted this again: army builds gained, because dense food means
+  fewer workers are needed to sustain one. example-mass-rush went from 1507 to
+  1699 and preset-rush from 807 to 1183, while pure economy fell, preset-boom
+  from 2061 to 1673.
 - Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
   walk, so expansion is a strong play whose real cost is the 200 food and the
   minute of lost production rather than the risk of interception.
@@ -436,8 +438,8 @@ than relying on there being none.
   last one ends it as `colony_eliminated`
 - corpses do not decay, nearby ones merge into a single pile, distant ones do
   not, and a fought-over match leaves piles worth more than a worker can carry
-- energy is conserved: total energy on the map does not drift across a whole
-  match, including when a queen dies part way through building a unit and when
+- energy is conserved across mixed food densities: total energy does not drift
+  across a whole match, including when a queen dies part way through building a unit and when
   units are recycled
 - recycling reshapes the live army, respects the worker floor, does nothing below
   the population ceiling, and books neither a loss nor a kill

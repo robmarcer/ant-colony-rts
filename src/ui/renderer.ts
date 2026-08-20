@@ -60,7 +60,11 @@ export class Renderer {
         ctx.fillRect(source.x * s - radius * 0.6, source.y * s - radius * 0.6, radius * 1.2, radius * 1.2);
       } else {
         const depletion = source.amount / source.initialAmount;
-        ctx.fillStyle = `rgba(111, 191, 90, ${0.35 + 0.55 * depletion})`;
+        // Tinted by type so density is visible: dull for leaf litter, green for
+        // seeds, amber for honeydew.
+        const tint =
+          source.type === 'honeydew' ? '214, 176, 74' : source.type === 'leaf_litter' ? '104, 122, 74' : '111, 191, 90';
+        ctx.fillStyle = `rgba(${tint}, ${0.35 + 0.55 * depletion})`;
         ctx.beginPath();
         ctx.arc(source.x * s, source.y * s, radius, 0, Math.PI * 2);
         ctx.fill();

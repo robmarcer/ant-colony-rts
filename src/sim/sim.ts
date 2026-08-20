@@ -1,6 +1,7 @@
 import { Rng, hashSeed } from './rng.js';
 import {
   ARRIVE_EPSILON,
+  CORPSE_DENSITY,
   CORPSE_MERGE_RADIUS,
   CORPSE_VALUE_FRACTION,
   DEFAULT_TIME_LIMIT_SECONDS,
@@ -454,6 +455,8 @@ export class Simulation {
     const source: FoodSource = {
       id: this.nextId(),
       kind: 'corpse',
+      type: 'seeds',
+      density: CORPSE_DENSITY,
       x: at.x,
       y: at.y,
       amount: value,
@@ -635,6 +638,7 @@ export class Simulation {
             x: source.x,
             y: source.y,
             estAmount: source.amount,
+            density: source.density,
             lastSeenTick: this.tick,
             distanceFromNest: this.distanceToNearestNest(colony.id, source),
           });

@@ -1,10 +1,36 @@
 # Changelog
 
-Current version: **0.21.0**. 21 releases, 143 recorded changes.
+Current version: **0.22.0**. 22 releases, 150 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.22.0 — Food comes in three densities
+
+2026-08-20 19:19 (UTC+07:00) · committed · 7 changes
+
+**Simulation**
+
+- Three food types: leaf_litter at density 0.6 in large piles, seeds at 1.0, honeydew at 1.9 in small ones. Density is energy per unit of a worker carrying volume, so a worker fills the same capacity and brings home 6, 10 or 19 per trip. Richer types are deliberately smaller, so a small rich pile nearby against a big thin one further out is a real decision.
+- Density is applied when food leaves the pile and never again at deposit, so the map stays a closed system. Verified: energy drift over a full match is 6.55e-11, well inside the 1e-6 tolerance the self test already enforced.
+- Types are drawn once per mirrored pair, so a pile and its twin always match and both colonies still face an identical map. Asserted directly.
+
+**Unit AI**
+
+- Worker targeting weighs density, 12 points of score per unit above 1, so workers prefer energy per trip without needing a rule for it. Guard post selection weighs it too, since denial is a rate rather than a total.
+
+**Balance**
+
+- This shifted the field more than expected. Army builds gained, because dense food means fewer workers are needed to sustain one: example-mass-rush 1507 to 1699 and preset-rush 807 to 1183, while pure economy fell, preset-boom 2061 to 1673. preset-rush went from starving to a single queen against preset-boom to winning that pairing by elimination at 505 seconds.
+
+**Tests**
+
+- Eight new checks. Four existing ones broke and each was examined rather than relaxed: three had premises that had expired, including a control whose outcome had already moved twice as the balance changed, now replaced with a constructed scenario that tests the mechanism instead of a matchup. The fourth was a real regression and is filed as its own issue rather than tuned away.
+
+**Docs**
+
+- Fix: The claim that guard_food denies 8% of enemy income has been removed from the authoring guide. It held when the population ceiling was 40 per nest; at 100 the opponent strips the map either way. The posture is now described as what it measurably is, a cheap way to trade.
 
 ## 0.21.0 — The changelog and brief open beside the match, not in a tab
 

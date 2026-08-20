@@ -299,6 +299,39 @@ export const CORPSE_MERGE_RADIUS = 6;
 export const STARTING_FOOD = 40;
 export const STARTING_WORKERS = 5;
 
+/**
+ * Food types, differing in energy density.
+ *
+ * Density is energy per unit of carrying volume, so a worker fills the same
+ * capacity and brings home more from a rich pile. It is deliberately not a
+ * multiplier applied at deposit: that would create energy out of nothing and
+ * break the closed system the self test asserts. The pile loses exactly what the
+ * worker delivers.
+ *
+ * Richer types come in smaller piles, so "a small rich pile nearby against a big
+ * thin one further out" is a real decision rather than an obvious one.
+ */
+export interface FoodTypeStats {
+  /** Energy per unit of a worker's carrying volume. */
+  density: number;
+  /** Multiplier on the generated pile size. */
+  sizeFactor: number;
+  /** Share of generated piles, need not sum to exactly 1. */
+  weight: number;
+}
+
+export const FOOD_TYPES = ['leaf_litter', 'seeds', 'honeydew'] as const;
+export type FoodType = (typeof FOOD_TYPES)[number];
+
+export const FOOD_TYPE_STATS: Record<FoodType, FoodTypeStats> = {
+  leaf_litter: { density: 0.6, sizeFactor: 1.6, weight: 0.35 },
+  seeds: { density: 1.0, sizeFactor: 1.0, weight: 0.45 },
+  honeydew: { density: 1.9, sizeFactor: 0.5, weight: 0.2 },
+};
+
+/** Corpses are flesh: ordinary density, so a battlefield is worth a normal trip. */
+export const CORPSE_DENSITY = 1.0;
+
 /** Map generation. Scaled with the map area so food density stays comparable. */
 export const FOOD_CLUSTER_PAIRS = 30; // mirrored, so 60 sources plus starters
 export const FOOD_CLUSTER_MIN = 180;

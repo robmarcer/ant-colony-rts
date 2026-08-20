@@ -1,3 +1,4 @@
+import type { FoodType } from './config.js';
 import type { BehaviourDefinition } from './definition.js';
 import type { StrategyConfig } from './strategy.js';
 
@@ -83,6 +84,10 @@ export interface Nest {
 export interface FoodSource {
   id: number;
   kind: 'cluster' | 'corpse';
+  /** Corpses are always ordinary density; clusters vary by type. */
+  type: FoodType;
+  /** Energy per unit of a worker's carrying volume. */
+  density: number;
   x: number;
   y: number;
   amount: number;
@@ -99,6 +104,8 @@ export interface KnownFood {
   y: number;
   /** What the colony believes is left, refreshed whenever a worker sees it. */
   estAmount: number;
+  /** Remembered along with the pile, so targeting can weigh energy per trip. */
+  density: number;
   lastSeenTick: number;
   distanceFromNest: number;
 }

@@ -350,8 +350,6 @@ function workerAi(sim: Simulation, unit: Unit): void {
   if (threat) return engage(sim, unit, threat);
   unit.targetEnemyId = null;
 
-  if (unit.carrying >= stats.carryCapacity) unit.state = 'returning';
-
   if (unit.state === 'returning') {
     if (moveToward(unit, home, stats.speed) || sim.atNest(unit)) {
       sim.depositFood(unit);
@@ -371,13 +369,18 @@ function workerAi(sim: Simulation, unit: Unit): void {
     }
     if (Math.hypot(source.x - unit.x, source.y - unit.y) <= GATHER_RADIUS) {
       unit.state = 'gathering';
-      const take = Math.min(stats.gatherRate * DT, stats.carryCapacity - unit.carrying, source.amount);
+      // Capacity is volume; a pile's density turns that into energy. A worker
+      // fills the same volume either way and carries home more from a rich
+      // pile. The pile loses exactly what the worker gains, so nothing is
+      // created: density is never applied again at deposit.
+      const capacity = stats.carryCapacity * source.density;
+      const take = Math.min(stats.gatherRate * source.density * DT, capacity - unit.carrying, source.amount);
       source.amount -= take;
       unit.carrying += take;
       const known = colony.knownFood.get(source.id);
       if (known) known.estAmount = source.amount;
       if (source.amount <= 0) sim.removeFood(source, source.kind === 'cluster');
-      if (unit.carrying >= stats.carryCapacity) unit.state = 'returning';
+      if (unit.carrying >= capacity - 1e-9) unit.state = 'returning';
     } else {
       unit.state = 'moving';
       moveToward(unit, source, stats.speed);
@@ -436,6 +439,11 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
     const dNest = sim.distanceToNearestNest(colony.id, candidate);
     const dEnemyNest = sim.distanceToNearestNest(sim.enemyColony(colony.id).id, candidate);
 
+    // Energy per trip, not just proximity: a rich pile is worth walking past a
+    // thin one for. Density 1 is neutral so this changes nothing for corpses or
+    // ordinary seeds.
+    const densityBonus = (candidate.density - 1) * 12;
+
     let score: number;
     switch (strategy.expansion_priority) {
       case 'nearest_food_first':
@@ -455,6 +463,8 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
           -0.5 * dWorker - 0.9 * dEnemyNest - 5 * Math.max(0, dNest - CONTEST_MAX_HAUL);
         break;
     }
+
+    score += densityBonus;
 
     // No crowding penalty here any more: workers physically queue at a busy
     // pile now, so congestion is real and counting it twice would over-correct.
@@ -714,6 +724,10 @@ function guardPost(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
     const score =
       1.5 * activity +
       0.04 * known.estAmount +
+      // Denial is a rate, not a total. A dense pile hands the enemy more energy
+      // per trip, so it is worth more to stand on than a bigger thin one, which
+      // scoring on amount alone got backwards once food types existed.
+      8 * (known.density - 1) +
       0.5 * denial -
       0.35 * fromUs -
       5 * Math.max(0, fromUs - GUARD_MAX_RANGE) -

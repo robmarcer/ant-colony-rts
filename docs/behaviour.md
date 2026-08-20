@@ -151,18 +151,20 @@ A post is held until the pile is exhausted. That stickiness is deliberate. An
 earlier version re-chose every tick and guards spent the match walking between
 piles, with 3 of 28 soldiers actually standing on one.
 
-Measured against an otherwise identical definition sitting at home, over four
-seeds against `preset-boom`: the opponent gathered 13,710 food instead of 14,878,
-lost 423 workers instead of 48, and cost 20 soldiers to do it. `preset-blockade`
-uses this posture and sits third of nine in the field at 78%. Guarding scales
-well with army size, because more soldiers cover more piles, so it gained 19
-points when the population ceiling was raised from 40 to 100.
+What it is worth, measured against an otherwise identical definition sitting at
+home: the opponent lost 216 workers instead of 148, a 1.45x kill rate, for a
+handful of soldiers. `preset-blockade` uses this posture and is second on the
+ladder.
 
-Two things worth knowing. Denial does not starve an opponent on this map: there
-are around sixty piles, so even six guarded is a minority, and the effect is a
-dent in their income rather than a stranglehold. And because the map is a closed
-system, killing workers deep in their half hands them the corpses, so guarding
-contested ground near your own side is worth more than guarding theirs.
+What it no longer does is starve anyone. Denial measured at 8% of enemy income
+when the population ceiling was 40 units per nest. At 100 the opponent fields
+around 275 workers across sixty piles and strips the map either way, so guarding
+six of them does not dent the total. The posture's value now is trading cheaply,
+and doing it on ground where the corpses fall to you.
+
+Because the map is a closed system, killing workers deep in their half hands them
+the corpses, so guarding contested ground near your own side is worth more than
+guarding theirs.
 
 ### expansion_priority
 
@@ -311,6 +313,24 @@ units walks within vision range of it (12 cells for a worker, 14 for a soldier,
 12 for a queen). Idle workers pick targets from that shared memory, which is the
 intel mechanic. Scouting has real value because unexplored food is invisible to
 your foragers even though the map is otherwise open.
+
+## Food types
+
+Three types with different energy density, where density is energy per unit of a
+worker's carrying volume: `leaf_litter` at 0.6 in large piles, `seeds` at 1.0,
+and `honeydew` at 1.9 in small ones. Corpses are 1.0.
+
+A worker fills the same volume from any pile, so it brings home 6, 10 or 19
+energy per trip respectively. Worker targeting weighs that automatically, adding
+12 points of score per unit of density above 1, so you do not need a rule to
+prefer the good stuff.
+
+It does interact with `expansion_priority`. `largest_food_first` scores on
+`estAmount`, and since richer piles are deliberately smaller, it will walk past
+honeydew to reach a big leaf litter pile. That is usually the wrong trade.
+
+Density is applied when the food leaves the pile, never again at deposit, so the
+map stays a closed system.
 
 ## Ants take up space
 

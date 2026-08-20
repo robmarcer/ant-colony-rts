@@ -1,5 +1,7 @@
 import { Rng } from './rng.js';
 import {
+  FOOD_TYPES,
+  FOOD_TYPE_STATS,
   FOOD_CLUSTER_MAX,
   FOOD_CLUSTER_MIN,
   FOOD_CLUSTER_PAIRS,
@@ -33,16 +35,30 @@ function dist(a: Vec, b: Vec): number {
 export function generateFood(rng: Rng, nextId: () => number): FoodSource[] {
   const sources: FoodSource[] = [];
 
-  const push = (p: Vec, amount: number) => {
+  const push = (p: Vec, amount: number, type: (typeof FOOD_TYPES)[number]) => {
+    const scaled = Math.round(amount * FOOD_TYPE_STATS[type].sizeFactor);
     sources.push({
       id: nextId(),
       kind: 'cluster',
+      type,
+      density: FOOD_TYPE_STATS[type].density,
       x: p.x,
       y: p.y,
-      amount,
-      initialAmount: amount,
+      amount: scaled,
+      initialAmount: scaled,
       deaths: 0,
     });
+  };
+
+  /** Weighted pick, drawn once per pair so a pile and its mirror twin match. */
+  const pickType = (): (typeof FOOD_TYPES)[number] => {
+    const total = FOOD_TYPES.reduce((sum, t) => sum + FOOD_TYPE_STATS[t].weight, 0);
+    let roll = rng.next() * total;
+    for (const type of FOOD_TYPES) {
+      roll -= FOOD_TYPE_STATS[type].weight;
+      if (roll <= 0) return type;
+    }
+    return 'seeds';
   };
 
   // One guaranteed easy source per colony, on the nest-to-centre line.
@@ -53,7 +69,8 @@ export function generateFood(rng: Rng, nextId: () => number): FoodSource[] {
       x: nest.x + ((centre.x - nest.x) / d) * STARTER_FOOD_DISTANCE,
       y: nest.y + ((centre.y - nest.y) / d) * STARTER_FOOD_DISTANCE,
     };
-    push(p, STARTER_FOOD_AMOUNT);
+    // Both starters are seeds, so neither colony opens on a better pile.
+    push(p, STARTER_FOOD_AMOUNT, 'seeds');
   }
 
   const minSeparation = 14;
@@ -75,8 +92,9 @@ export function generateFood(rng: Rng, nextId: () => number): FoodSource[] {
     if (sources.some((s) => dist(p, s) < minSeparation || dist(m, s) < minSeparation)) continue;
 
     const amount = Math.round(rng.range(FOOD_CLUSTER_MIN, FOOD_CLUSTER_MAX));
-    push(p, amount);
-    push(m, amount);
+    const type = pickType();
+    push(p, amount, type);
+    push(m, amount, type);
     placed++;
   }
 

@@ -144,6 +144,26 @@ All from your colony's point of view. Operators: `gt`, `gte`, `lt`, `lte`, `eq`.
 There is no fog of war, so enemy counts are exact. Food is different: a source
 only enters your memory once one of your units walks within vision of it.
 
+## Food is not all the same
+
+Three types, differing in energy density, which is energy per unit of a worker's
+carrying volume. A worker fills the same capacity either way, so a rich pile is
+worth more per trip:
+
+| type | density | pile size | energy per worker trip |
+|---|---|---|---|
+| leaf_litter | 0.6 | large | 6 |
+| seeds | 1.0 | standard | 10 |
+| honeydew | 1.9 | small | 19 |
+
+Corpses are density 1.0. Richer types come in smaller piles, so a small rich pile
+nearby against a big thin one further out is a real choice. Worker targeting
+already prefers density, so you do not need a rule for it, but it interacts with
+`expansion_priority`: `largest_food_first` will walk past honeydew for a big
+leaf litter pile, which is usually wrong.
+
+Density never creates energy. The pile loses exactly what the worker delivers.
+
 ## Six traps, all measured in this build
 
 These are not opinions. Each one cost a real strategy real win rate.
@@ -202,20 +222,23 @@ Ask the ladder rather than trusting this list, since it is a snapshot:
 curl localhost:8787/api/ladder
 ```
 
-At the time of writing, over 144 comparable matches, with ratings on an Elo-like
-scale and 95% intervals on the win rate:
+At the time of writing, over 180 comparable matches:
 
 | rating | definition | win rate |
 |---|---|---|
-| 1971 | preset-boom | 88% (72-95%) |
-| 1889 | preset-blockade | 81% (65-91%) |
-| 1816 | example-adaptive | 75% (58-87%) |
-| 1680 | preset-scout | 63% (45-77%) |
-| 1544 | example-mass-rush | 50% (34-66%) |
-| 1508 | preset-balanced | 47% (31-64%) |
-| 1266 | preset-turtle | 28% (16-45%) |
-| 1057 | preset-rush | 16% (7-32%) |
-| 769 | preset-harass | 3% (1-16%) |
+| 2052 | claude-v1 | 94% (82-98%) |
+| 1783 | example-adaptive | 75% (59-86%) |
+| 1699 | example-mass-rush | 67% (50-80%) |
+| 1673 | preset-blockade | 64% (48-78%) |
+| 1673 | preset-boom | 64% (48-78%) |
+| 1515 | preset-balanced | 47% (32-63%) |
+| 1515 | preset-scout | 47% (32-63%) |
+| 1225 | preset-turtle | 22% (12-38%) |
+| 1183 | preset-rush | 19% (10-35%) |
+| 682 | preset-harass | 0% (0-10%) |
+
+`claude-v1` was written by a model reading this brief and the ladder, so it is
+worth reading before you start: `curl localhost:8787/api/definitions/claude-v1`.
 
 Note how wide those intervals are at 32 games each. Beating `preset-balanced`
 once proves nothing.

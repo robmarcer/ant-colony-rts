@@ -1,0 +1,99 @@
+{
+  "id": "claude-v1",
+  "name": "claude-v1",
+  "author": "claude-opus-5 (interactive, no API key)",
+  "version": 1,
+  "notes": "Reasoning from the ladder: preset-boom leads at 2227 on pure economy, four nests and almost no army (0.9/0.1, aggression 0.05). preset-blockade is second at 1946 doing nothing but denying food. Sieges take 60s per queen and boom has four of them, so killing it is impractical. So: match its expansion, then starve it. Expand hard first, then convert to denial once the map is contested. Recycle workers into soldiers at the ceiling, because that is the only way to change composition without more nests.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.85,
+      "soldier": 0.15
+    },
+    "aggression": 0,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 14,
+    "soldier_posture": "defend_nest",
+    "risk_tolerance": 0.35,
+    "target_nests": 4,
+    "recycle_surplus": 0,
+    "expansion_bias": "toward_food"
+  },
+  "rules": [
+    {
+      "id": "deny-once-established",
+      "note": "three nests in means the economy is safe, so start taking theirs off them",
+      "when": [
+        {
+          "metric": "my_nests",
+          "op": "gte",
+          "value": 3
+        },
+        {
+          "metric": "my_workers",
+          "op": "gte",
+          "value": 60
+        }
+      ],
+      "set": {
+        "unit_production_ratio": {
+          "worker": 0.6,
+          "soldier": 0.4
+        },
+        "aggression": 0.7,
+        "soldier_posture": "guard_food",
+        "expansion_bias": "toward_enemy",
+        "recycle_surplus": 0.5
+      },
+      "min_hold_seconds": 180
+    },
+    {
+      "id": "press-a-weak-army",
+      "note": "metric-versus-metric: if they have fewer soldiers than me, deny harder rather than guessing a threshold",
+      "when": [
+        {
+          "metric": "enemy_soldiers",
+          "op": "lt",
+          "metric2": "my_soldiers"
+        },
+        {
+          "metric": "sim_seconds",
+          "op": "gte",
+          "value": 300
+        }
+      ],
+      "set": {
+        "aggression": 0.9,
+        "target_nests": 5
+      },
+      "min_hold_seconds": 120
+    },
+    {
+      "id": "home-emergency",
+      "note": "last in the list so it overrides the pushes above",
+      "when": [
+        {
+          "any_of": [
+            {
+              "metric": "enemies_near_my_nest",
+              "op": "gte",
+              "value": 4
+            },
+            {
+              "metric": "my_queen_hp_pct",
+              "op": "lt",
+              "value": 70
+            }
+          ]
+        }
+      ],
+      "set": {
+        "aggression": 0,
+        "soldier_posture": "defend_nest",
+        "recycle_surplus": 0,
+        "target_nests": 3
+      },
+      "min_hold_seconds": 90
+    }
+  ],
+  "updatedAt": "2026-08-20T11:34:22.988Z"
+}
