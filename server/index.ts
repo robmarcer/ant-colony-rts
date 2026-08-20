@@ -12,7 +12,7 @@
  * of two definition files and a seed.
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
@@ -43,6 +43,7 @@ import { balanceFingerprint } from '../src/meta/fingerprint.js';
 import { runRoundRobin, runSeries } from '../src/match/tournament.js';
 import {
   NotFound,
+  ROOT,
   deleteDefinition,
   definitionPath,
   ensureStarterDefinitions,
@@ -456,6 +457,32 @@ app.get('/api/stats/:id', handler((req, res) => {
   });
 }));
 
+// ------------------------------------------------------------------ static site
+
+/**
+ * Serve the built viewer from the same process and the same port as the API.
+ *
+ * In development Vite serves the pages and proxies /api here, which means two
+ * origins and a proxy rule. For anything else, a single port removes both: the
+ * pages fetch /api on their own origin, so there is nothing to configure and
+ * nothing to get wrong when the host is not localhost.
+ */
+const distDir = join(here, '../dist');
+if (existsSync(distDir)) {
+  app.use(express.static(distDir));
+} else {
+  // Better to say so than to serve a 404 that looks like a broken install.
+  app.get('/', (_req, res) => {
+    res
+      .status(503)
+      .type('text/plain')
+      .send(
+        'The viewer has not been built yet. Run `npm start`, which builds it and then serves it, ' +
+          'or `npm run dev` for the development server. The API itself is up: try /api.',
+      );
+  });
+}
+
 // ----------------------------------------------------------------------- errors
 
 app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -487,5 +514,14 @@ app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
 // the API would then try to bind the same port as vite.
 const port = Number(process.env.ANT_API_PORT ?? 8787);
 app.listen(port, () => {
-  console.log(`ant-colony-rts api on http://localhost:${port}/api`);
+  console.log(`ant-colony-rts ${APP_VERSION} listening on http://localhost:${port}`);
+  console.log(`  api        http://localhost:${port}/api`);
+  console.log(`  brief      http://localhost:${port}/api/brief`);
+  if (existsSync(distDir)) {
+    console.log(`  viewer     http://localhost:${port}/`);
+    console.log(`  changelog  http://localhost:${port}/changelog.html`);
+  } else {
+    console.log('  viewer     not built, run npm start to build and serve it');
+  }
+  console.log(`  data       ${ROOT}`);
 });

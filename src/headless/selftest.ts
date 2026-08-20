@@ -753,6 +753,32 @@ console.log('replay is version pinned');
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
 }
 
+console.log('the project is installable');
+{
+  // Cheap guards on the install story. A clean clone reaching a running server
+  // is verified by hand, but these stop the pieces silently disappearing.
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+    license?: string;
+    engines?: { node?: string };
+    scripts: Record<string, string>;
+    dependencies: Record<string, string>;
+  };
+
+  check('a licence is declared', pkg.license === 'MIT', String(pkg.license));
+  check('a LICENSE file exists', readFileSync(join(root, 'LICENSE'), 'utf8').includes('MIT License'));
+  check('the required Node version is declared', !!pkg.engines?.node, String(pkg.engines?.node));
+  check('.nvmrc agrees with engines', readFileSync(join(root, '.nvmrc'), 'utf8').trim() === '22');
+  check('there is a start script', typeof pkg.scripts.start === 'string');
+  check(
+    'the runtime is a real dependency, not a dev one',
+    typeof pkg.dependencies.tsx === 'string',
+    'npm start runs the server through tsx, so it cannot be a devDependency',
+  );
+  check('a Dockerfile exists', readFileSync(join(root, 'Dockerfile'), 'utf8').includes('FROM node:'));
+  check('the readme leads with the two command quick start', readFileSync(join(root, 'README.md'), 'utf8').includes('npm install\nnpm start'));
+}
+
 console.log('the agent brief matches the code');
 {
   // A brief that has quietly fallen behind the simulation is worse than none at

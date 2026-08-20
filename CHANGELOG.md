@@ -1,10 +1,38 @@
 # Changelog
 
-Current version: **0.15.0**. 15 releases, 105 recorded changes.
+Current version: **0.16.0**. 16 releases, 114 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.16.0 — Installable and runnable on plain Node
+
+2026-08-20 17:22 (UTC+07:00) · committed · 9 changes
+
+**API**
+
+- The server prints every URL it serves on startup, and returns an explanatory 503 rather than a bare 404 when the viewer has not been built.
+
+**Viewer**
+
+- Fix: The instructions page now reports the origin it was actually served from rather than a hardcoded hostname and port 8787, which was only correct in the default local setup. Every API route lives under /api and Vite proxies that in development, so one value is right in both.
+
+**Tests**
+
+- Verified by hand from a clean clone into an empty directory: npm install then npm start, with an empty ANT_DATA_DIR, self-seeded 9 definitions, served all three pages and every API route from one port, ran a match and persisted the record. Eight cheap guards added so the pieces cannot silently disappear.
+
+**Docs**
+
+- MIT licence added. The repository is public, and with no licence file that meant all rights reserved: readable but not legally reusable.
+- README leads with two commands, and states that the Anthropic key is optional and only used by npm run coach.
+
+**Tooling**
+
+- Fix: npm start builds the viewer and serves it with the API from a single process on one port. Previously the only way to run both halves was the Vite dev server, and a production build of the viewer could not reach the API at all, because the /api proxy existed only in the dev config.
+- engines.node set to >=22 and a matching .nvmrc. Nothing previously stated the required version, so a mismatch showed up as a runtime failure instead of an install error. 22 is what is actually tested; lower may work but is unverified.
+- Fix: tsx moved from devDependencies to dependencies, because npm start runs the server through it. It was never really a dev-only tool here.
+- Dockerfile and .dockerignore, with the data directory as a volume so definitions and match records survive a rebuild.
 
 ## 0.15.0 — The changelog and the LLM brief are their own pages
 

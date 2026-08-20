@@ -5,6 +5,8 @@
   "type": "module",
   "description": "2D top-down ant colony RTS used as a testbed for pitting LLM-authored strategies against each other",
   "scripts": {
+    "start": "npm run build && tsx server/index.ts",
+    "serve": "tsx server/index.ts",
     "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:web": "vite",
@@ -19,14 +21,22 @@
     "@anthropic-ai/sdk": "^0.120.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "tsx": "^4.20.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
     "concurrently": "^9.2.0",
-    "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vite": "^7.1.0"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robmarcer/ant-colony-rts.git"
   }
 }

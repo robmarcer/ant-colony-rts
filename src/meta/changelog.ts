@@ -39,6 +39,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.16.0',
+    timestamp: '2026-08-20T17:22:37+07:00',
+    title: 'Installable and runnable on plain Node',
+    precision: 'commit',
+    changes: [
+      { area: 'docs', detail: 'MIT licence added. The repository is public, and with no licence file that meant all rights reserved: readable but not legally reusable.' },
+      { area: 'tooling', detail: 'npm start builds the viewer and serves it with the API from a single process on one port. Previously the only way to run both halves was the Vite dev server, and a production build of the viewer could not reach the API at all, because the /api proxy existed only in the dev config.', fix: true },
+      { area: 'tooling', detail: 'engines.node set to >=22 and a matching .nvmrc. Nothing previously stated the required version, so a mismatch showed up as a runtime failure instead of an install error. 22 is what is actually tested; lower may work but is unverified.' },
+      { area: 'tooling', detail: 'tsx moved from devDependencies to dependencies, because npm start runs the server through it. It was never really a dev-only tool here.', fix: true },
+      { area: 'tooling', detail: 'Dockerfile and .dockerignore, with the data directory as a volume so definitions and match records survive a rebuild.' },
+      { area: 'ui', detail: 'The instructions page now reports the origin it was actually served from rather than a hardcoded hostname and port 8787, which was only correct in the default local setup. Every API route lives under /api and Vite proxies that in development, so one value is right in both.', fix: true },
+      { area: 'api', detail: 'The server prints every URL it serves on startup, and returns an explanatory 503 rather than a bare 404 when the viewer has not been built.' },
+      { area: 'docs', detail: 'README leads with two commands, and states that the Anthropic key is optional and only used by npm run coach.' },
+      { area: 'tests', detail: 'Verified by hand from a clean clone into an empty directory: npm install then npm start, with an empty ANT_DATA_DIR, self-seeded 9 definitions, served all three pages and every API route from one port, ran a match and persisted the record. Eight cheap guards added so the pieces cannot silently disappear.' },
+    ],
+  },
+  {
     version: '0.15.0',
     timestamp: '2026-08-20T17:08:48+07:00',
     title: 'The changelog and the LLM brief are their own pages',

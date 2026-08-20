@@ -15,18 +15,33 @@ frames.
 
 ## Quick start
 
+Needs Node 22 or later, and nothing else.
+
 ```bash
 npm install
-npm run selftest
-npm run dev
+npm start
 ```
 
-`npm run dev` starts the API on 8787 and the viewer on http://localhost:5273.
-Three pages: the match at `/`, the changelog at `/changelog.html`, and the brief
-to paste into a model at `/instructions.html`. The header links to the latter two
-open in their own tab, so reading them never disturbs a running match.
+That builds the viewer and serves it and the API together on
+http://localhost:8787. Three pages: the match at `/`, the changelog at
+`/changelog.html`, and the brief to paste into a model at `/instructions.html`.
+The header links to the latter two open in their own tab, so reading them never
+disturbs a running match.
 
-Headless matches need neither:
+`npm run dev` is the development alternative: it runs the API on 8787 and a Vite
+dev server with hot reload on http://localhost:5273, proxying `/api` through.
+
+Nothing else is required. An Anthropic API key is optional and only used by
+`npm run coach`; every other command works without one. State lives in
+`definitions/` and `matches/`, and `ANT_DATA_DIR` moves both somewhere else.
+
+With Docker instead:
+
+```bash
+docker build -t ant-colony-rts . && docker run -p 8787:8787 -v ant-data:/data ant-colony-rts
+```
+
+Headless matches need no server at all:
 
 ```bash
 npm run match -- --a example-mass-rush --b preset-boom --seed 1
@@ -34,9 +49,6 @@ npm run match -- --a example-mass-rush --b preset-boom --repeat 5
 npm run match -- --round-robin --seeds 1,2
 npm run match -- --list
 ```
-
-An LLM API key is optional. It is used only by `npm run coach`, which is one
-worked implementation of the improvement loop. Everything else works without it.
 
 ## Changelog and versioning
 
@@ -276,6 +288,10 @@ the game. Food that was actually gathered still counts through the lifetime term
 
 Score only decides time limit matches. An elimination wins regardless of score,
 which is why a winner can show a lower score than the loser.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
 
 ## Layout
 

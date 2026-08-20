@@ -7,7 +7,13 @@
 import { escapeHtml } from './changelog-view.js';
 
 const content = document.getElementById('content')!;
-const apiBase = `${location.protocol}//${location.hostname}:8787`;
+/**
+ * The address to hand a model is the one this page was reached on, not a
+ * hardcoded port. Every API route lives under /api, and in development Vite
+ * proxies /api through to the server, so this is correct whether the page came
+ * from the dev server or from the single-port production process.
+ */
+const apiBase = `${location.origin}/api`;
 
 async function load(): Promise<void> {
   let brief: string;
@@ -27,9 +33,9 @@ async function load(): Promise<void> {
     <h1>Instructions for an LLM</h1>
     <p class="provenance">
       Paste everything below into the model you want writing strategies, then tell it the API is at
-      <code>${escapeHtml(apiBase)}</code>. This is the live response from <code>GET /api/brief</code>, so it
-      cannot fall out of step with the simulation. A model with network access to that address can fetch it
-      itself instead.
+      <code>${escapeHtml(apiBase)}</code>. That is the address this page was served from, so it is the one that
+      works. This is the live response from <code>GET /api/brief</code>, so it cannot fall out of step with the
+      simulation, and a model with network access to that address can fetch it itself instead.
     </p>
     <p><button id="copy" class="primary">Copy the brief</button> <span id="copied" class="provenance"></span></p>
     <pre id="brief"></pre>`;
