@@ -12,6 +12,8 @@ import {
   NEST_RADIUS,
   NEST_REGEN_PER_SECOND,
   SCORE_WEIGHTS,
+  STALEMATE_UNIT_TOLERANCE,
+  STALEMATE_WINDOW_SECONDS,
   STARTING_FOOD,
   STARTING_WORKERS,
   TICKS_PER_SECOND,
@@ -41,6 +43,11 @@ export interface SimOptions {
   timeLimitSeconds?: number;
   /** One behaviour file per colony, fixed for the whole match. */
   definitions?: [BehaviourDefinition, BehaviourDefinition];
+  /**
+   * Sim seconds of no material change before the match is called a stalemate.
+   * 0 disables the detector entirely.
+   */
+  stalemateWindowSeconds?: number;
 }
 
 /** One row of the per-colony time series recorded for post-match analysis. */
@@ -101,11 +108,17 @@ export class Simulation {
   private lastStarveAlarmTick: [number, number] = [-9999, -9999];
   private queenHpFlag: [number, number] = [1, 1];
   private firstContactSeen = false;
+  readonly stalemateWindowTicks: number;
+  /** Signature of the strategic position, and the tick it was last seen to move. */
+  private positionAnchor: { tick: number; signature: number[] } = { tick: 0, signature: [] };
 
   constructor(options: SimOptions = {}) {
     this.seed = hashSeed(options.seed ?? 'default');
     this.rng = new Rng(this.seed);
     this.timeLimitTicks = Math.round((options.timeLimitSeconds ?? DEFAULT_TIME_LIMIT_SECONDS) * TICKS_PER_SECOND);
+    this.stalemateWindowTicks = Math.round(
+      (options.stalemateWindowSeconds ?? STALEMATE_WINDOW_SECONDS) * TICKS_PER_SECOND,
+    );
 
     const definitions: [BehaviourDefinition, BehaviourDefinition] =
       options.definitions ?? [fallbackDefinition('balanced'), fallbackDefinition('balanced')];
@@ -526,6 +539,7 @@ export class Simulation {
 
     this.resolveCombat();
     this.checkAlarms();
+    this.checkProgress();
     if (this.tick % Math.round(SERIES_INTERVAL_SECONDS * TICKS_PER_SECOND) === 0) this.sample();
     this.checkOutcome();
   }
@@ -772,13 +786,56 @@ export class Simulation {
     };
   }
 
+  /**
+   * A snapshot of everything that has to change for a match to be going
+   * anywhere. Unit counts are included, but only a swing beyond the tolerance
+   * counts, so a colony that loses a worker and rebuilds it has not progressed.
+   */
+  private positionSignature(): number[] {
+    const signature: number[] = [];
+    for (const id of [0, 1] as ColonyId[]) {
+      signature.push(
+        this.colonies[id].nests.length,
+        this.queensOf(id).length,
+        Math.round(this.lowestQueenHealth(id) * 100),
+        this.countUnits(id, 'worker') + this.countUnits(id, 'soldier'),
+      );
+    }
+    return signature;
+  }
+
+  private checkProgress(): void {
+    if (this.stalemateWindowTicks <= 0) return;
+    const current = this.positionSignature();
+    const anchor = this.positionAnchor.signature;
+    if (anchor.length === 0) {
+      this.positionAnchor = { tick: this.tick, signature: current };
+      return;
+    }
+    // Indices 3 and 7 are unit counts, which get a tolerance. Everything else
+    // must match exactly.
+    let moved = false;
+    for (let i = 0; i < current.length; i++) {
+      const isUnitCount = i === 3 || i === 7;
+      const delta = Math.abs(current[i] - anchor[i]);
+      if (isUnitCount ? delta > STALEMATE_UNIT_TOLERANCE : delta > 0) {
+        moved = true;
+        break;
+      }
+    }
+    if (moved) this.positionAnchor = { tick: this.tick, signature: current };
+  }
+
   private checkOutcome(): void {
     const aAlive = this.isAlive(0);
     const bAlive = this.isAlive(1);
     const breakdown: [ScoreBreakdown, ScoreBreakdown] = [this.scoreOf(0), this.scoreOf(1)];
     const scores: [number, number] = [breakdown[0].total, breakdown[1].total];
 
-    const finish = (winner: ColonyId | null, reason: 'colony_eliminated' | 'time_limit' | 'both_colonies_eliminated') => {
+    const finish = (
+      winner: ColonyId | null,
+      reason: 'colony_eliminated' | 'time_limit' | 'both_colonies_eliminated' | 'stalemate',
+    ) => {
       this.outcome = { status: 'finished', winner, reason, scores, scoreBreakdown: breakdown };
       const label =
         winner === null ? 'Draw' : `${this.colonies[winner].name} wins`;
@@ -798,6 +855,18 @@ export class Simulation {
     if (!bAlive) return finish(0, 'colony_eliminated');
     if (this.tick >= this.timeLimitTicks) {
       finish(scores[0] === scores[1] ? null : scores[0] > scores[1] ? 0 : 1, 'time_limit');
+      return;
+    }
+    // Neither colony can make progress, so the clock is only burning compute.
+    // Resolved on score exactly as the time limit would be.
+    if (this.stalemateWindowTicks > 0 && this.tick - this.positionAnchor.tick >= this.stalemateWindowTicks) {
+      this.pushEvent(
+        'stalemate',
+        null,
+        `no material change for ${Math.round(this.stalemateWindowTicks / TICKS_PER_SECOND)}s, calling it a stalemate`,
+        true,
+      );
+      finish(scores[0] === scores[1] ? null : scores[0] > scores[1] ? 0 : 1, 'stalemate');
     }
   }
 

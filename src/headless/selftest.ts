@@ -302,6 +302,86 @@ console.log('closed system');
   }
 }
 
+console.log('stalemate detection');
+{
+  const stagnant = new Simulation({
+    seed: '1',
+    timeLimitSeconds: 90000,
+    definitions: [def('a', 'turtle'), def('b', 'turtle')],
+  });
+  stagnant.run(900001);
+  check(
+    'two passive strategies end as a stalemate instead of burning the clock',
+    stagnant.outcome.status === 'finished' && stagnant.outcome.reason === 'stalemate',
+    stagnant.outcome.status === 'finished' ? stagnant.outcome.reason : 'running',
+  );
+  check('the stalemate ends the match far short of the limit', stagnant.simSeconds < 5000, `${Math.round(stagnant.simSeconds)}s`);
+  check(
+    'the stalemate is logged with its window',
+    stagnant.events.some((e) => e.type === 'stalemate' && /600s/.test(e.text)),
+  );
+
+  // Deliberately a rules-based massing attack rather than preset-rush. A naive
+  // rush against a boom is genuinely stagnant: it starves down to nothing while
+  // the boom, on aggression 0.05, never walks over to finish the queen off. The
+  // detector calling that a stalemate is correct, so it is no test of a war.
+  const massing = parse(
+    {
+      id: 'massing',
+      name: 'massing',
+      base: { ...PRESETS.balanced, aggression: 0, min_worker_reserve: 10, target_nests: 2 },
+      rules: [
+        {
+          id: 'commit',
+          when: [{ metric: 'my_soldiers', op: 'gte', value: 12 }],
+          set: { aggression: 1, soldier_posture: 'attack_enemy_nest', risk_tolerance: 0.85 },
+        },
+      ],
+    },
+    'massing',
+  ).definition;
+  const decisive = new Simulation({
+    seed: '1',
+    timeLimitSeconds: 90000,
+    definitions: [massing, def('b', 'boom')],
+  });
+  decisive.run(900001);
+  check(
+    'a decisive match is still decided by elimination, not called a stalemate',
+    decisive.outcome.status === 'finished' && decisive.outcome.reason === 'colony_eliminated',
+    decisive.outcome.status === 'finished' ? decisive.outcome.reason : 'running',
+  );
+
+  const starved = new Simulation({
+    seed: '1',
+    timeLimitSeconds: 90000,
+    definitions: [def('a', 'rush'), def('b', 'boom')],
+  });
+  starved.run(900001);
+  check(
+    'a colony starved to nothing ends the match even if the winner never attacks',
+    starved.outcome.status === 'finished' && starved.outcome.reason === 'stalemate',
+    starved.outcome.status === 'finished' ? starved.outcome.reason : 'running',
+  );
+  check(
+    'and the starved colony is the one that loses',
+    starved.outcome.status === 'finished' && starved.outcome.winner === 1,
+  );
+
+  const disabled = new Simulation({
+    seed: '1',
+    timeLimitSeconds: 900,
+    stalemateWindowSeconds: 0,
+    definitions: [def('a', 'turtle'), def('b', 'turtle')],
+  });
+  disabled.run(9001);
+  check(
+    'the detector can be switched off',
+    disabled.outcome.status === 'finished' && disabled.outcome.reason === 'time_limit',
+    disabled.outcome.status === 'finished' ? disabled.outcome.reason : 'running',
+  );
+}
+
 console.log('replay is version pinned');
 {
   const record = runMatch({

@@ -142,6 +142,7 @@ export type MatchEventType =
   | 'rule_deactivated'
   | 'nest_under_attack'
   | 'starving'
+  | 'stalemate'
   | 'match_end';
 
 export interface MatchEvent {
@@ -160,7 +161,7 @@ export type MatchOutcome =
   | {
       status: 'finished';
       winner: ColonyId | null; // null means a draw on score
-      reason: 'colony_eliminated' | 'time_limit' | 'both_colonies_eliminated';
+      reason: 'colony_eliminated' | 'time_limit' | 'both_colonies_eliminated' | 'stalemate';
       scores: [number, number];
       scoreBreakdown: [ScoreBreakdown, ScoreBreakdown];
     };

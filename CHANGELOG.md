@@ -1,10 +1,29 @@
 # Changelog
 
-Current version: **0.7.0**. 7 releases, 56 recorded changes.
+Current version: **0.8.0**. 8 releases, 62 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.8.0 — Stalemated matches end instead of running the clock out
+
+2026-08-20 14:39 (UTC+07:00) · committed · 6 changes
+
+**Simulation**
+
+- Fix: A match now ends as a stalemate when nothing material has changed for 600 sim seconds, resolved on score exactly as the time limit is. At the 90,000 second default, two passive strategies previously ran the full limit, decided nothing, and cost 30 seconds of compute each.
+- Progress is measured against a signature of the strategic position: nests, queens, weakest queen health, and unit counts within a tolerance of 2. A death-based check does not work, because two colonies parked at their population ceiling still trade the odd worker every few minutes while being completely stagnant, which would reset the window forever.
+- New stalemateWindowSeconds option, 0 to disable, and a logged stalemate event naming the window so the digest says why a match ended when it did.
+- A side effect worth knowing: this also resolves matches where a colony has been starved to a single queen with no workers and no food, and therefore cannot ever produce again, but the winner has aggression too low to walk over and finish it. preset-rush against preset-boom is exactly that, and used to burn the full 90,000 seconds to reach a verdict that was settled at 2,590.
+
+**Performance**
+
+- preset-turtle against itself went from 90,000 sim seconds and 30 seconds of compute to 864 sim seconds and 0.4 seconds, about 75 times cheaper. preset-boom against preset-turtle went from 26 seconds of compute to 7.5, and preset-rush against preset-boom from 33.7 to well under a second.
+
+**Tests**
+
+- Four checks: a passive pairing ends as a stalemate well short of the limit and logs its window, a decisive pairing is still decided by elimination, and the detector can be switched off. Verified against the whole field that this changes no live match: a 112 match round robin at 900 seconds returns byte-identical win rates, margins and elimination count.
 
 ## 0.7.0 — Stored matches are pinned to the code that made them
 

@@ -39,6 +39,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.0',
+    timestamp: '2026-08-20T14:39:21+07:00',
+    title: 'Stalemated matches end instead of running the clock out',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'A match now ends as a stalemate when nothing material has changed for 600 sim seconds, resolved on score exactly as the time limit is. At the 90,000 second default, two passive strategies previously ran the full limit, decided nothing, and cost 30 seconds of compute each.', fix: true },
+      { area: 'sim', detail: 'Progress is measured against a signature of the strategic position: nests, queens, weakest queen health, and unit counts within a tolerance of 2. A death-based check does not work, because two colonies parked at their population ceiling still trade the odd worker every few minutes while being completely stagnant, which would reset the window forever.' },
+      { area: 'sim', detail: 'New stalemateWindowSeconds option, 0 to disable, and a logged stalemate event naming the window so the digest says why a match ended when it did.' },
+      { area: 'perf', detail: 'preset-turtle against itself went from 90,000 sim seconds and 30 seconds of compute to 864 sim seconds and 0.4 seconds, about 75 times cheaper. preset-boom against preset-turtle went from 26 seconds of compute to 7.5, and preset-rush against preset-boom from 33.7 to well under a second.' },
+      { area: 'sim', detail: 'A side effect worth knowing: this also resolves matches where a colony has been starved to a single queen with no workers and no food, and therefore cannot ever produce again, but the winner has aggression too low to walk over and finish it. preset-rush against preset-boom is exactly that, and used to burn the full 90,000 seconds to reach a verdict that was settled at 2,590.' },
+      { area: 'tests', detail: 'Four checks: a passive pairing ends as a stalemate well short of the limit and logs its window, a decisive pairing is still decided by elimination, and the detector can be switched off. Verified against the whole field that this changes no live match: a 112 match round robin at 900 seconds returns byte-identical win rates, margins and elimination count.' },
+    ],
+  },
+  {
     version: '0.7.0',
     timestamp: '2026-08-20T14:32:09+07:00',
     title: 'Stored matches are pinned to the code that made them',

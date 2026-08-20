@@ -18,6 +18,20 @@ export const MAP_WIDTH = 200;
 export const MAP_HEIGHT = 200;
 
 /**
+ * A match ends as a stalemate when nothing material has changed for this long.
+ *
+ * "Material" cannot just mean "a unit died": two colonies parked at their
+ * population ceiling still trade the odd worker every few minutes while being
+ * completely stagnant, so a death-based check would keep resetting and never
+ * fire. Instead the detector anchors on a signature of the strategic position
+ * (nests, queens, weakest queen health, and unit counts within a tolerance) and
+ * fires only when that signature has not moved at all.
+ */
+export const STALEMATE_WINDOW_SECONDS = 600;
+/** Unit count swing, either side, that counts as the position having moved. */
+export const STALEMATE_UNIT_TOLERANCE = 2;
+
+/**
  * Default match length in sim seconds (25 hours of sim time).
  *
  * Set this high deliberately: the intent is that matches are decided by one
