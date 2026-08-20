@@ -230,7 +230,7 @@ export function ensureStarterDefinitions(): string[] {
     author: 'hand',
     version: 1,
     notes:
-      'Holds every soldier at home until a ball of 12 exists, then commits at the nearest enemy nest. A trickle of single soldiers dies for nothing, so the timing rule is the whole strategy. Takes a second nest first, because one nest can only support 40 units and 12 soldiers out of 40 is a thin army.',
+      'Holds every soldier at home until a ball of 12 exists, then commits at the nearest enemy nest. A trickle of single soldiers dies for nothing, so the timing rule is the whole strategy. Takes a second nest first, for the extra build slot and the shorter haul.',
     base: {
       unit_production_ratio: { worker: 0.5, soldier: 0.5 },
       aggression: 0.0,

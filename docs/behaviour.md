@@ -142,7 +142,9 @@ piles, with 3 of 28 soldiers actually standing on one.
 Measured against an otherwise identical definition sitting at home, over four
 seeds against `preset-boom`: the opponent gathered 13,710 food instead of 14,878,
 lost 423 workers instead of 48, and cost 20 soldiers to do it. `preset-blockade`
-uses this posture and sits fourth of nine in the field at 59%.
+uses this posture and sits third of nine in the field at 78%. Guarding scales
+well with army size, because more soldiers cover more piles, so it gained 19
+points when the population ceiling was raised from 40 to 100.
 
 Two things worth knowing. Denial does not starve an opponent on this map: there
 are around sixty piles, so even six guarded is a minority, and the effect is a
@@ -176,9 +178,10 @@ Founding a nest buys two things:
 - Another build slot. Every settled queen produces independently, from the shared
   food stockpile, so a second nest doubles how fast the colony can turn food into
   units.
-- Another 40 units of population capacity. Each nest supports 40 workers and
-  soldiers. A colony on one nest is capped at 40 no matter how much food it has,
-  so on a large map a single nest cannot use the food it can reach.
+- Another 100 units of population capacity. Each nest supports 100 workers and
+  soldiers, so a colony on one nest cannot use all the food it can reach. This
+  ceiling is set high enough to be a safety bound rather than a balance lever:
+  at 100 the field measures the same as it does with no cap at all.
 
 It also costs:
 
@@ -283,15 +286,15 @@ All measured in this build, not assumed.
 
 Trickling. A soldier takes 12 seconds to build and walks to the enemy base
 alone, where it dies without accomplishing anything. `preset-rush`, which sets
-aggression 0.9 and `attack_enemy_nest` from the first tick, wins 18% of a round
+aggression 0.9 and `attack_enemy_nest` from the first tick, wins 19% of a round
 robin. The same aggression held behind a rule that waits for 12 soldiers before
-committing wins 93%. That is `example-mass-rush`. If you intend to attack, hold
+committing wins 84%. That is `example-mass-rush`. If you intend to attack, hold
 at `aggression: 0` and commit on a `my_soldiers` threshold.
 
-Never expanding. `target_nests: 1` caps you at 40 units and one build slot. On
-this map that is well below what the food can support, so a one-nest colony
-simply gets out-produced. `preset-turtle` and `preset-rush`, both on one nest,
-sit at the bottom of the table at 18%. Every strategy above 70% expands.
+Never expanding. `target_nests: 1` gives you one build slot and one drop-off
+point. Production throughput and hauling distance, not the population ceiling,
+are what punish it: `preset-turtle` and `preset-rush`, both on one nest, sit at
+28% and 19%. Every strategy above 69% expands.
 
 Banking. Unspent food is worth 0.1 per unit in the score, against 4 per worker,
 10 per soldier and 150 per queen. A colony that ends with 15,000 banked food

@@ -39,6 +39,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.11.0',
+    timestamp: '2026-08-20T15:21:19+07:00',
+    title: 'Population ceiling raised to 100 per nest',
+    precision: 'commit',
+    changes: [
+      { area: 'balance', detail: 'UNITS_PER_NEST raised from 40 to 100, so the maximum colony is 600 workers and soldiers across six nests rather than 240. Measured over three settings on the same nine definitions, 144 matches each: at 100 the field is identical to having no cap at all, with the same win rates, the same 52 eliminations and margins within rounding. At 40 it was not a bound but a balance lever, worth 19 points of win rate to preset-blockade and 9 to preset-turtle.' },
+      { area: 'balance', detail: 'Expansion is still decisive, now purely through the mechanics chosen for it: one build slot per queen and a shorter haul. Every strategy above 69% expands and the two one-nest presets sit at 28% and 19%, so removing the headcount advantage did not remove the incentive.' },
+      { area: 'perf', detail: 'The cap is kept as a compute and legibility bound. Uncapped, a single match reached 1,169 units in one colony and took 20.9 seconds instead of 3.3, and a round robin went from 108 to 118 seconds. 1,169 units is also not something the viewer can usefully draw.' },
+      { area: 'balance', detail: 'Field after the change: example-adaptive and example-mass-rush 84%, preset-blockade 78%, preset-boom 69%, preset-scout 44%, preset-balanced 41%, preset-turtle 28%, preset-rush 19%, preset-harass 3%. Spread narrows from 6-91% to 3-84%, which is the acknowledged cost: a wider spread discriminates between strategies more sharply.' },
+      { area: 'docs', detail: 'README and the authoring guide updated with the new ceiling, the reasoning behind it and the re-measured field. The mass-rush worked example no longer explains itself in terms of a 40 unit ceiling.' },
+    ],
+  },
+  {
     version: '0.10.0',
     timestamp: '2026-08-20T15:01:33+07:00',
     title: 'Soldiers can guard food',

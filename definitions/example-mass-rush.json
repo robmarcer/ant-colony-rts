@@ -3,7 +3,7 @@
   "name": "example-mass-rush",
   "author": "hand",
   "version": 1,
-  "notes": "Holds every soldier at home until a ball of 12 exists, then commits at the nearest enemy nest. A trickle of single soldiers dies for nothing, so the timing rule is the whole strategy. Takes a second nest first, because one nest can only support 40 units and 12 soldiers out of 40 is a thin army.",
+  "notes": "Holds every soldier at home until a ball of 12 exists, then commits at the nearest enemy nest. A trickle of single soldiers dies for nothing, so the timing rule is the whole strategy. Takes a second nest first, for the extra build slot and the shorter haul.",
   "base": {
     "unit_production_ratio": {
       "worker": 0.5,
@@ -69,5 +69,5 @@
       }
     }
   ],
-  "updatedAt": "2026-08-20T06:33:35.329Z"
+  "updatedAt": "2026-08-20T08:17:59.337Z"
 }

@@ -123,12 +123,23 @@ export const MIN_ENEMY_NEST_DISTANCE = 30;
 /** Cap on nests per colony, a backstop rather than a balance lever. */
 export const MAX_NESTS_PER_COLONY = 6;
 /**
- * Workers and soldiers each nest can support. This is the second reason to
- * expand, alongside the extra build slot: a colony on one nest hits a hard
- * ceiling no matter how much food it has. Queens do not count against it, and a
- * colony at its ceiling can still build a queen in order to raise it.
+ * Workers and soldiers each nest can support. Queens do not count against it,
+ * and a colony at its ceiling can still build a queen in order to raise it.
+ *
+ * This is a compute and legibility bound, not a balance lever. Measured on the
+ * nine starter definitions over 144 matches, this value at 100 produces an
+ * identical field to having no cap at all: same win rates, same 52 eliminations,
+ * margins within rounding. What it buys is a bounded worst case. Uncapped, a
+ * single match reached 1,169 units in one colony and took 20.9 seconds instead
+ * of 3.3, which is unwatchable in the viewer and hurts every round robin.
+ *
+ * It was previously 40, which did shape the field: worth 19 points of win rate
+ * to preset-blockade and 9 to preset-turtle. That is a lot of influence for a
+ * number originally chosen to stop the frame rate dying, so expansion is now
+ * decisive because of the mechanics it was given deliberately, the extra build
+ * slot and the shorter haul, rather than because of a headcount.
  */
-export const UNITS_PER_NEST = 40;
+export const UNITS_PER_NEST = 100;
 export const DEPOSIT_RADIUS = 2.5;
 /** Fraction of max hp regenerated per second while inside your own nest. */
 export const NEST_REGEN_PER_SECOND = 0.03;

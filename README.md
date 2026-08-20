@@ -128,8 +128,12 @@ Expanding buys two things, and both matter:
 
 - Another build slot. Every settled queen produces independently from the shared
   stockpile, so nests multiply how fast food becomes units.
-- Another 40 units of population. Each nest supports 40 workers and soldiers, so
-  a one-nest colony is hard capped at 40 however much food it can reach.
+- Another 100 units of population. Each nest supports 100 workers and soldiers,
+  so a one-nest colony cannot use all the food it can reach. This ceiling is a
+  compute and legibility bound rather than a balance lever: measured over 144
+  matches, 100 per nest produces the same field as no cap at all, while keeping
+  the worst case to 3.3 seconds a match instead of 20.9 and colonies to a size
+  the viewer can actually show.
 
 It costs 200 food, a minute of that queen's production, and a slow undefended
 queen crossing open ground where she can be intercepted. Killing a queen destroys
@@ -244,13 +248,15 @@ The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
 matches are not degenerate. Current state, measured over a round robin of the
 starter definitions across two seeds (112 matches):
 
-- 40% of matches were decided by eliminating a colony, the rest on score at the
+- 36% of matches were decided by eliminating a colony, the rest on score at the
   time limit.
-- Win rates spread from 6% to 91% across nine definitions.
+- Win rates spread from 3% to 84% across nine definitions.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
-- Every strategy above 70% expands. Both one-nest presets sit at 18%.
+- Every strategy above 69% expands. The two one-nest presets sit at 28% and 19%.
+- Area denial is competitive: preset-blockade, which does nothing but post
+  soldiers on food, is third at 78%.
 - Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
   walk, so expansion is a strong play whose real cost is the 200 food and the
   minute of lost production rather than the risk of interception.
@@ -277,7 +283,8 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
   `known_food_*` metrics much more interesting.
 - No obstacles or pathfinding. Units move in straight lines.
 - One build slot per queen, so production scales with nests rather than being
-  buyable separately.
+  buyable separately. That, plus hauling distance, is what makes expanding worth
+  200 food; the population ceiling is deliberately not doing that work.
 - Nest sites are chosen by the simulation, not by the definition. A definition
   says how many nests it wants, not where they go.
 - The food stockpile is shared across a colony's nests rather than held per nest.
