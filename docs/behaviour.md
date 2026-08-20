@@ -233,6 +233,28 @@ Which way a new queen leans when choosing between candidate sites.
 Measured on one seed with `target_nests: 4`, mean distance from a new nest to the
 nearest enemy nest: 121 cells forward, 143 neutral, 160 safe.
 
+### relocate_food
+
+Ferry a distant or contested pile closer to your own nests instead of hauling it
+into the stockpile. The load is dropped on the ground as a pile, so nothing is
+created or destroyed and the map stays a closed system.
+
+It is never the efficient choice. The worker walks the same distance and the food
+still needs collecting afterwards, so measured against the same definition
+without it, banked food does not go up. What it buys is risk: a pile beyond
+hauling range, or one sitting closer to their nests than to yours, is food they
+are better placed to take than you are. Moving it makes every future trip to what
+is left of it shorter, and takes it off them.
+
+Only applies to piles of at least 60 energy that are either beyond 100 cells from
+your nearest nest or closer to the enemy than to you. The value is a probability,
+so 0.5 hedges rather than commits. Loads are dropped 14 cells out from a nest,
+close enough to be safe and cheap to collect but far enough to be a staging pile
+rather than a deposit by another name.
+
+Pairs naturally with `contest_enemy_food`, which is what sends workers to that
+kind of pile in the first place.
+
 ### recycle_surplus
 
 Sends surplus units home to be eaten by a queen. Their full food cost, plus

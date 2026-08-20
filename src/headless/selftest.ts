@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CORPSE_DENSITY,
+  RELOCATE_DROP_DISTANCE,
   CORPSE_VALUE_FRACTION,
   FOOD_TYPE_STATS,
   MAP_HEIGHT,
@@ -211,6 +212,66 @@ console.log('losing one queen is not losing the match');
     sim.outcome.status === 'finished' && sim.outcome.reason === 'colony_eliminated',
     sim.outcome.status === 'finished' ? sim.outcome.reason : 'running',
   );
+}
+
+console.log('relocating food');
+{
+  const withKnob = (relocate: number) =>
+    parse(
+      {
+        id: 'r',
+        name: 'r',
+        base: { ...PRESETS.balanced, expansion_priority: 'contest_enemy_food', relocate_food: relocate },
+        rules: [],
+      },
+      'r',
+    ).definition;
+
+  const play = (relocate: number) => {
+    const sim = new Simulation({ seed: '1', timeLimitSeconds: 900, definitions: [withKnob(relocate), def('o', 'boom')] });
+    const start = sim.totalEnergy();
+    let worst = 0;
+    for (let i = 0; i < 90 && !sim.finished; i++) {
+      sim.run(100);
+      worst = Math.max(worst, Math.abs(sim.totalEnergy() - start));
+    }
+    return { sim, relocated: sim.colonies[0].foodRelocated, banked: sim.colonies[0].lifetimeFoodGathered, worst };
+  };
+
+  const off = play(0);
+  const on = play(1);
+  check('relocation is off by default', off.relocated === 0, `${Math.round(off.relocated)} relocated`);
+  check('relocation happens once turned on', on.relocated > 0, `${Math.round(on.relocated)} relocated`);
+  check('relocating conserves energy', on.worst < 1e-6, `worst drift ${on.worst.toExponential(2)}`);
+  check(
+    'relocating is not a shortcut to a bigger stockpile',
+    on.banked < off.banked * 1.25,
+    `banked ${Math.round(on.banked)} against ${Math.round(off.banked)} without it`,
+  );
+
+  // Every load in transit must be headed somewhere near our own nests.
+  const mid = new Simulation({ seed: '1', timeLimitSeconds: 900, definitions: [withKnob(1), def('o', 'boom')] });
+  mid.run(5000);
+  const ferrying = mid.unitsOf(0).filter((u) => u.state === 'relocating' && u.relocateTo);
+  check(
+    'a relocating worker is headed for its own ground',
+    ferrying.every((u) => mid.distanceToNearestNest(0, u.relocateTo!) <= RELOCATE_DROP_DISTANCE + 2),
+    `${ferrying.length} in transit`,
+  );
+
+  // The drop itself, tested directly rather than inferred from a match.
+  const direct = new Simulation({ seed: 'drop', timeLimitSeconds: 300, definitions: [def('a', 'boom'), def('b', 'boom')] });
+  direct.run(600);
+  const carrier = direct.unitsOf(0).find((u) => u.type === 'worker')!;
+  carrier.carrying = 40;
+  const energyBefore = direct.totalEnergy();
+  const foodBefore = direct.colonies[0].food;
+  const pilesBefore = direct.food.size;
+  direct.dropAsPile(carrier);
+  check('dropping a load conserves energy exactly', Math.abs(direct.totalEnergy() - energyBefore) < 1e-9);
+  check('dropping a load does not bank it', direct.colonies[0].food === foodBefore);
+  check('the load is on the ground afterwards', direct.food.size >= pilesBefore && carrier.carrying === 0);
+  check('and it is counted as relocated', direct.colonies[0].foodRelocated === 40);
 }
 
 console.log('food types');

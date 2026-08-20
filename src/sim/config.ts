@@ -329,6 +329,21 @@ export const FOOD_TYPE_STATS: Record<FoodType, FoodTypeStats> = {
   honeydew: { density: 1.9, sizeFactor: 0.5, weight: 0.2 },
 };
 
+/**
+ * Ferrying a pile somewhere safer instead of hauling it home.
+ *
+ * It must not beat hauling on efficiency, or it is a free upgrade rather than a
+ * choice: a relocating worker makes the same trip and ends with the food still
+ * on the ground, so it is strictly slower in calories per second. What it buys is
+ * risk. Food beyond hauling range, or sitting where the enemy will take it, is
+ * worth moving somewhere your workers can come back to.
+ */
+export const RELOCATE_MIN_PILE = 60;
+/** How close to a nest a relocated pile is dropped. */
+export const RELOCATE_DROP_DISTANCE = 14;
+/** A pile this far from our nests is a candidate for moving closer. */
+export const RELOCATE_MIN_DISTANCE = CONTEST_MAX_HAUL;
+
 /** Corpses are flesh: ordinary density, so a battlefield is worth a normal trip. */
 export const CORPSE_DENSITY = 1.0;
 

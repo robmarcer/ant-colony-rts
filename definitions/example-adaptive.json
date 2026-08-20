@@ -16,7 +16,8 @@
     "risk_tolerance": 0.3,
     "target_nests": 2,
     "recycle_surplus": 0,
-    "expansion_bias": "toward_food"
+    "expansion_bias": "toward_food",
+    "relocate_food": 0
   },
   "rules": [
     {
@@ -152,5 +153,5 @@
       }
     }
   ],
-  "updatedAt": "2026-08-20T10:58:48.636Z"
+  "updatedAt": "2026-08-20T12:20:07.565Z"
 }

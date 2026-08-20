@@ -25,6 +25,7 @@ import {
   TICKS_PER_SECOND,
   UNIT_RADIUS,
   UNIT_STATS,
+  type FoodType,
 } from './config.js';
 import { HOME_NEST_POSITIONS, generateFood } from './world.js';
 import { PRESETS, type StrategyConfig } from './strategy.js';
@@ -167,6 +168,7 @@ export class Simulation {
       unitsProduced: { queen: 1, worker: STARTING_WORKERS, soldier: 0 },
       nestsFounded: 0,
       unitsRecycled: { queen: 0, worker: 0, soldier: 0 },
+      foodRelocated: 0,
       queensLostInTransit: 0,
       unitsLost: { queen: 0, worker: 0, soldier: 0 },
       recentLosses: 0,
@@ -353,6 +355,7 @@ export class Simulation {
       build: null,
       guardFoodId: null,
       recycling: false,
+      relocateTo: null,
     };
     this.units.set(unit.id, unit);
     return unit;
@@ -435,6 +438,15 @@ export class Simulation {
    * battle leaves a few worthwhile piles instead of a scatter of crumbs.
    */
   addCorpse(at: Vec, value: number): void {
+    this.addFoodPile(at, value, 'seeds');
+  }
+
+  /**
+   * Add energy to the ground, merging into a nearby pile of the same kind. Used
+   * by both corpses and relocated loads, so a battlefield and a stockpile
+   * someone chose to move behave the same way.
+   */
+  addFoodPile(at: Vec, value: number, type: FoodType): void {
     if (value <= 0) return;
 
     for (const source of this.food.values()) {
@@ -898,6 +910,23 @@ export class Simulation {
    * shared across the colony rather than held per nest, so the value of a new
    * nest is a shorter round trip and an extra build slot, not a separate purse.
    */
+  /**
+   * Drop a carried load on the ground as a pile instead of banking it.
+   *
+   * A relocation, not a deposit: the energy stays on the map and merges into any
+   * pile already there. Nothing is created or destroyed, so the closed system is
+   * untouched, and it is strictly slower than hauling because the same trip ends
+   * with the food still needing collecting.
+   */
+  dropAsPile(unit: Unit): void {
+    if (unit.carrying <= 0) return;
+    const colony = this.colonies[unit.owner];
+    colony.foodRelocated += unit.carrying;
+    this.addFoodPile({ x: unit.x, y: unit.y }, unit.carrying, 'seeds');
+    unit.carrying = 0;
+    unit.relocateTo = null;
+  }
+
   depositFood(unit: Unit): void {
     const colony = this.colonies[unit.owner];
     colony.food += unit.carrying;

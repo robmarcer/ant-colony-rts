@@ -15,7 +15,8 @@ export type UnitState =
   | 'scouting'    // heading to an unexplored point
   | 'guarding'    // soldier holding position near a nest
   | 'founding'    // new queen walking to a site to start a nest
-  | 'recycling';  // heading home to be consumed by a queen
+  | 'recycling'   // heading home to be consumed by a queen
+  | 'relocating'; // carrying food to a safer spot rather than into the stockpile
 
 export interface Vec {
   x: number;
@@ -59,6 +60,11 @@ export interface Unit {
   guardFoodId: number | null;
   /** Marked for recycling: walk home and be consumed, freeing population room. */
   recycling: boolean;
+  /**
+   * Where this worker is dropping its load as a pile, rather than depositing it.
+   * Set when a colony decides a pile is worth moving rather than banking.
+   */
+  relocateTo: Vec | null;
 }
 
 /**
@@ -139,6 +145,8 @@ export interface Colony {
   nestsFounded: number;
   /** Own units consumed by a queen to change the army's composition. */
   unitsRecycled: Record<UnitType, number>;
+  /** Energy ferried to a safer pile rather than banked. */
+  foodRelocated: number;
   /** Queens killed while walking to a site, i.e. expansions that never landed. */
   queensLostInTransit: number;
   unitsLost: Record<UnitType, number>;

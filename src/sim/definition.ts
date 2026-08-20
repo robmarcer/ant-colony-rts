@@ -141,6 +141,7 @@ const KNOB_KEYS = new Set([
   'target_nests',
   'recycle_surplus',
   'expansion_bias',
+  'relocate_food',
 ]);
 
 export function slugify(input: string): string {
@@ -345,6 +346,7 @@ export const DEFINITION_DOC = {
     target_nests: 'integer 1..6',
     recycle_surplus: 'number 0..1',
     expansion_bias: EXPANSION_BIASES,
+    relocate_food: 'number 0..1',
   },
   rule_metrics: RULE_METRICS,
   rule_ops: RULE_OPS,

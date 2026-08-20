@@ -151,9 +151,9 @@ declarative data, evaluated once per sim second inside the simulation, so the
 match stays deterministic and every activation is logged. Nothing is executed as
 code.
 
-The nine knobs are `unit_production_ratio`, `aggression`, `expansion_priority`,
+The ten knobs are `unit_production_ratio`, `aggression`, `expansion_priority`,
 `min_worker_reserve`, `soldier_posture`, `risk_tolerance`, `target_nests`,
-`recycle_surplus` and `expansion_bias`. Keeping the surface small is what makes
+`recycle_surplus`, `expansion_bias` and `relocate_food`. Keeping the surface small is what makes
 two models comparable: they are filling in the same form.
 
 Starter definitions are written to `definitions/` on first run.

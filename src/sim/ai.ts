@@ -25,6 +25,9 @@ import {
   MIN_ENEMY_NEST_DISTANCE,
   MIN_NEST_SEPARATION,
   NEST_RADIUS,
+  RELOCATE_DROP_DISTANCE,
+  RELOCATE_MIN_DISTANCE,
+  RELOCATE_MIN_PILE,
   RECYCLE_MAX_PER_DECISION,
   RECYCLE_PRESSURE_FRACTION,
   RECYCLE_TOLERANCE_FRACTION,
@@ -350,6 +353,16 @@ function workerAi(sim: Simulation, unit: Unit): void {
   if (threat) return engage(sim, unit, threat);
   unit.targetEnemyId = null;
 
+  // Ferrying a load to safer ground rather than banking it.
+  if (unit.state === 'relocating' && unit.relocateTo) {
+    if (moveToward(unit, unit.relocateTo, stats.speed)) {
+      sim.dropAsPile(unit);
+      unit.state = 'idle';
+      unit.targetFoodId = null;
+    }
+    return;
+  }
+
   if (unit.state === 'returning') {
     if (moveToward(unit, home, stats.speed) || sim.atNest(unit)) {
       sim.depositFood(unit);
@@ -380,7 +393,15 @@ function workerAi(sim: Simulation, unit: Unit): void {
       const known = colony.knownFood.get(source.id);
       if (known) known.estAmount = source.amount;
       if (source.amount <= 0) sim.removeFood(source, source.kind === 'cluster');
-      if (unit.carrying >= capacity - 1e-9) unit.state = 'returning';
+      if (unit.carrying >= capacity - 1e-9) {
+        const relocation = relocationTarget(sim, unit, colony, strategy, source);
+        if (relocation) {
+          unit.relocateTo = relocation;
+          unit.state = 'relocating';
+        } else {
+          unit.state = 'returning';
+        }
+      }
     } else {
       unit.state = 'moving';
       moveToward(unit, source, stats.speed);
@@ -482,6 +503,47 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
 
   unit.targetFoodId = best.foodId;
   unit.state = 'moving';
+}
+
+/**
+ * Should this load be ferried somewhere safer instead of banked?
+ *
+ * Only for piles worth the trouble that are beyond comfortable hauling range or
+ * sitting closer to the enemy than to us. It is never the efficient choice: the
+ * worker walks the same distance and the food still needs collecting afterwards.
+ * What it buys is denying the enemy a pile they were better placed to take, and
+ * shortening every future trip to what is left of it.
+ */
+function relocationTarget(
+  sim: Simulation,
+  unit: Unit,
+  colony: Colony,
+  strategy: StrategyConfig,
+  source: { x: number; y: number; amount: number },
+): Vec | null {
+  if (strategy.relocate_food <= 0) return null;
+  // Nothing left worth moving, so just take it home.
+  if (source.amount < RELOCATE_MIN_PILE) return null;
+
+  const fromUs = sim.distanceToNearestNest(colony.id, source);
+  const fromThem = sim.distanceToNearestNest(sim.enemyColony(colony.id).id, source);
+  const contested = fromThem < fromUs;
+  if (fromUs < RELOCATE_MIN_DISTANCE && !contested) return null;
+
+  // The knob is a probability, so a colony can hedge rather than commit.
+  if (sim.rng.next() > strategy.relocate_food) return null;
+
+  const home = sim.nearestNest(colony.id, unit);
+  if (!home) return null;
+  // Drop it short of the nest: close enough to be safe and cheap to collect,
+  // far enough that it is a staging pile rather than a deposit by another name.
+  const dx = source.x - home.x;
+  const dy = source.y - home.y;
+  const length = Math.hypot(dx, dy) || 1;
+  return {
+    x: clamp(home.x + (dx / length) * RELOCATE_DROP_DISTANCE, 1, MAP_WIDTH - 1),
+    y: clamp(home.y + (dy / length) * RELOCATE_DROP_DISTANCE, 1, MAP_HEIGHT - 1),
+  };
 }
 
 /** Explore outward from one of the colony's nests, chosen at random. */

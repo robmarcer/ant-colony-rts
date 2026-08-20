@@ -60,6 +60,13 @@ export interface StrategyConfig {
    * toward_food is the existing behaviour.
    */
   expansion_bias: ExpansionBias;
+  /**
+   * Willingness to ferry a distant or threatened pile closer to home instead of
+   * hauling it straight into the stockpile. Always slower in calories per second
+   * than hauling, so it is a risk decision, not an efficiency one. 0 never does
+   * it.
+   */
+  relocate_food: number;
 }
 
 export const DEFAULT_STRATEGY: StrategyConfig = {
@@ -72,6 +79,7 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   target_nests: 2,
   recycle_surplus: 0,
   expansion_bias: 'toward_food',
+  relocate_food: 0,
 };
 
 /** Hand written strategies, used for LLM-free matches and as a baseline. */
@@ -87,6 +95,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 4,
     recycle_surplus: 0.5,
     expansion_bias: 'toward_food',
+    relocate_food: 0,
   },
   rush: {
     unit_production_ratio: { worker: 0.35, soldier: 0.65 },
@@ -98,6 +107,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 1,
     recycle_surplus: 0,
     expansion_bias: 'toward_food',
+    relocate_food: 0,
   },
   harass: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -111,6 +121,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 2,
     recycle_surplus: 0,
     expansion_bias: 'toward_enemy',
+    relocate_food: 0.5,
   },
   turtle: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -122,6 +133,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 1,
     recycle_surplus: 0,
     expansion_bias: 'toward_safety',
+    relocate_food: 0,
   },
   blockade: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -133,6 +145,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 2,
     recycle_surplus: 0.5,
     expansion_bias: 'toward_enemy',
+    relocate_food: 0.5,
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -144,6 +157,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     target_nests: 3,
     recycle_surplus: 0,
     expansion_bias: 'toward_food',
+    relocate_food: 0,
   },
 };
 
@@ -221,6 +235,7 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
       ),
       recycle_surplus: numberOr(input.recycle_surplus, 'recycle_surplus', 0, 1, fallback.recycle_surplus),
       expansion_bias: bias,
+      relocate_food: numberOr(input.relocate_food, 'relocate_food', 0, 1, fallback.relocate_food),
     },
     warnings,
   };
@@ -271,6 +286,13 @@ export const STRATEGY_JSON_SCHEMA = {
       description:
         'Willingness to take a bad fight. Low values retreat to the nest at high health and only engage when locally stronger. High values fight to the death.',
     },
+    relocate_food: {
+      type: 'number',
+      minimum: 0,
+      maximum: 1,
+      description:
+        'Willingness to ferry a distant or threatened food pile closer to your own nests instead of hauling it into the stockpile. The food stays on the map as a pile, so nothing is created or destroyed. It is always slower in calories per second than hauling, because the worker makes the same trip and the food is still on the ground at the end, so this is a risk decision: it applies to piles beyond hauling range or sitting where the enemy will take them. 0 never relocates.',
+    },
     expansion_bias: {
       type: 'string',
       enum: [...EXPANSION_BIASES],
@@ -302,5 +324,6 @@ export const STRATEGY_JSON_SCHEMA = {
     'target_nests',
     'recycle_surplus',
     'expansion_bias',
+    'relocate_food',
   ],
 } as const;

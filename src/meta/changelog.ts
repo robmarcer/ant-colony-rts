@@ -39,6 +39,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.23.0',
+    timestamp: '2026-08-20T19:27:49+07:00',
+    title: 'Workers can ferry a pile closer to home',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'New tenth knob relocate_food: instead of hauling a load into the stockpile, a worker can drop it on the ground nearer its own nests. The food stays on the map and merges into any pile already there, so nothing is created or destroyed and energy stays conserved, measured at a drift of 5e-11 across a match.' },
+      { area: 'sim', detail: 'Deliberately never the efficient choice. The worker walks the same distance and the food still needs collecting afterwards, so banked food does not rise: 3,601 with the knob at 1 against 3,701 without it. What it buys is risk, on piles of at least 60 energy that are either beyond 100 cells from your nearest nest or closer to the enemy than to you.' },
+      { area: 'sim', detail: 'The knob is a probability rather than a switch, so a colony can hedge: 0.5 relocated 336 energy where 1.0 relocated 500. Loads are dropped 14 cells out from a nest, close enough to be safe and cheap to collect but far enough to be a staging pile rather than a deposit by another name.' },
+      { area: 'sim', detail: 'Corpse merging generalised into addFoodPile, so a relocated load and a battlefield behave identically on the ground.' },
+      { area: 'balance', detail: 'preset-harass and preset-blockade ship with 0.5, since both use contest_enemy_food and it is their workers that end up on piles worth moving.' },
+      { area: 'tests', detail: 'Nine checks, four of them testing dropAsPile directly rather than inferring it from a match: energy conserved exactly, the load is not banked, it is on the ground afterwards, and it is counted. Plus every load in transit is headed for the colony own ground, and turning the knob on does not raise the stockpile.' },
+    ],
+  },
+  {
     version: '0.22.0',
     timestamp: '2026-08-20T19:19:34+07:00',
     title: 'Food comes in three densities',

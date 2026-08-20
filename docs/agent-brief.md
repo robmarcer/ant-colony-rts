@@ -102,7 +102,7 @@ will switch behaviour on and off and achieve nothing.
 Anything the parser rejects comes back in `issues` with an exact path. Read it.
 A rule naming a metric that does not exist is silently dropped from the match.
 
-## The nine knobs, in order of how much they decide
+## The ten knobs, in order of how much they decide
 
 1. `target_nests` (1-6). The strongest lever. Each nest is an independent build
    slot drawing on the shared food stockpile, plus 100 more units of population,
@@ -123,7 +123,12 @@ A rule naming a metric that does not exist is silently dropped from the match.
    many. Also the floor recycling will not cull below.
 8. `recycle_surplus` (0-1). Send surplus units home to be eaten by a queen,
    returning their full cost. Only works at 90%+ of your population ceiling.
-9. `expansion_bias`. Which way a new queen leans when choosing between sites:
+9. `relocate_food` (0-1). Ferry a distant or contested pile closer to home
+   instead of banking it. Never more efficient than hauling, since the worker
+   makes the same trip and the food still needs collecting; it buys risk, on
+   piles the enemy is better placed to take than you are. Pairs with
+   `contest_enemy_food`.
+10. `expansion_bias`. Which way a new queen leans when choosing between sites:
    `toward_food`, `toward_enemy` or `toward_safety`. Measured over a match,
    mean distance from a new nest to the nearest enemy nest was 121, 143 and 160
    cells respectively. Forward nests extend how far `contest_enemy_food` and
