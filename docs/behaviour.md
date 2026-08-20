@@ -1,5 +1,9 @@
 # Writing a behaviour definition
 
+If you are a model being pointed at this project, read
+[agent-brief.md](agent-brief.md) first. It is shorter, it is written for you, and
+it lists the traps. This document is the fuller reference for exact formulas.
+
 A behaviour definition is the whole brain of one colony. You write it before a
 match and then have no further contact with the game. The simulation reads it,
 plays the match to the end, and writes a log you can read afterwards.

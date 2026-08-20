@@ -246,6 +246,13 @@ export const STRATEGY_JSON_SCHEMA = {
       description:
         'Willingness to take a bad fight. Low values retreat to the nest at high health and only engage when locally stronger. High values fight to the death.',
     },
+    recycle_surplus: {
+      type: 'number',
+      minimum: 0,
+      maximum: 1,
+      description:
+        'How fast surplus units are sent home to be eaten by a queen, returning their full food cost to the stockpile, so you can reshape the army you already have rather than only what you build next. 0 never recycles, 1 recalls about four units a second. Only applies at or above 90% of your population ceiling, because with room to spare, building the type you want beats culling to make space for it. Never culls workers below min_worker_reserve.',
+    },
     target_nests: {
       type: 'integer',
       minimum: 1,

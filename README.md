@@ -59,6 +59,23 @@ the hour, not the minute. Everything after the initial commit is marked `commit`
 and carries a git hash, which is the point of putting the project under version
 control.
 
+## Pointing an LLM at it
+
+`docs/agent-brief.md` is written for a model rather than a human reader: the loop,
+the eight knobs, the rule format, the traps that have each cost a real strategy
+real win rate, and how to read a match log. `AGENTS.md` routes an agent to it.
+
+With the server running the same brief is at `GET /api/brief`, so a model given
+nothing but the base URL can bootstrap itself. `npm run coach` uses that endpoint
+as its system prompt rather than keeping a copy, since a copy drifts the moment
+the simulation changes.
+
+The self test asserts the brief has not fallen behind the code: every knob, rule
+metric, posture, expansion priority and operator must appear in it, and the queen
+health, attacker cap, population ceiling and recycling threshold it quotes must
+match `config.ts`. A brief that is quietly out of date is worse than none, because
+a model reads it, believes it, and plays to rules that no longer exist.
+
 ## The loop
 
 1. `GET /api/schema` describes the behaviour format, unit stats and scoring.
@@ -328,7 +345,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 106 properties, including:
+`npm run selftest` asserts 117 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk
@@ -357,6 +374,8 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - soldiers on `guard_food` hold their post rather than chasing, are not posted on
   the enemy doorstep, are released when their pile runs out, and measurably deny
   the opponent food compared with sitting at home
+- the agent brief documents every knob, metric, posture, priority and operator,
+  and the balance numbers it quotes match the config
 - the changelog is well formed: unique semver versions, parseable timestamps
   carrying an offset, newest first, every entry has changes, `APP_VERSION`
   matches the newest entry, and a reconstructed entry never claims a commit
@@ -368,6 +387,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 | Endpoint | Purpose |
 |---|---|
 | `GET /api` | endpoint index |
+| `GET /api/brief` | the agent brief as markdown, for a model with only HTTP access |
 | `GET /api/schema` | behaviour format, knob meanings, unit stats, scoring |
 | `GET /api/changelog` | every recorded change, newest first, with timestamps |
 | `GET /api/definitions` | list |

@@ -26,7 +26,11 @@ import {
   MAX_NESTS_PER_COLONY,
   MIN_ENEMY_NEST_DISTANCE,
   MIN_NEST_SEPARATION,
+  QUEEN_ARMOUR,
+  QUEEN_MAX_ATTACKERS,
+  RECYCLE_PRESSURE_FRACTION,
   SCORE_WEIGHTS,
+  STALEMATE_WINDOW_SECONDS,
   STARTING_FOOD,
   STARTING_WORKERS,
   TICKS_PER_SECOND,
@@ -79,6 +83,7 @@ app.get('/api', (_req, res) => {
     description:
       'Local testbed. Write a behaviour definition, run a hands-off match, read the log, revise. No LLM is consulted during a match.',
     endpoints: {
+      'GET /api/brief': 'read this first if you are here to write strategies: the whole loop, the traps, and how to read a result',
       'GET /api/schema': 'the behaviour definition format, knob meanings, rule metrics, unit stats, scoring',
       'GET /api/changelog': 'every recorded change to the game, newest first, with timestamps',
       'GET /api/definitions': 'list behaviour definitions',
@@ -121,6 +126,15 @@ app.get('/api/changelog', (_req, res) => {
     entries: CHANGELOG,
   });
 });
+
+/**
+ * The agent brief, served so an LLM given nothing but this base URL can bootstrap
+ * itself without filesystem access.
+ */
+app.get('/api/brief', handler((_req, res) => {
+  const path = join(here, '../docs/agent-brief.md');
+  res.type('text/markdown').send(readFileSync(path, 'utf8'));
+}));
 
 app.get('/api/schema', (_req, res) => {
   res.json({
@@ -173,6 +187,29 @@ app.get('/api/schema', (_req, res) => {
       nest_regen: 'units inside their own nest regain 3% of max health per second. Queens do not regenerate.',
     },
     unit_stats: UNIT_STATS,
+    sieges: {
+      queen_health: UNIT_STATS.queen.maxHp,
+      queen_armour: QUEEN_ARMOUR,
+      max_simultaneous_attackers: QUEEN_MAX_ATTACKERS,
+      seconds_of_sustained_assault: Math.round(
+        UNIT_STATS.queen.maxHp / (QUEEN_MAX_ATTACKERS * (UNIT_STATS.soldier.attack - QUEEN_ARMOUR)),
+      ),
+      note:
+        `Killing a queen is a siege, not a drive-by. Only ${QUEEN_MAX_ATTACKERS} attackers can reach her at once however large the army outside, so piling on more soldiers does not speed it up past that limit: what they buy is holding the ground for the whole assault. Armour is subtracted from every hit, which makes workers nearly useless against a queen. A colony with several nests has several queens, each needing its own siege.`,
+      measured_consequence:
+        'This makes committed aggression substantially weaker. 22% of matches end in an elimination, down from 36% before sieges, and no commit threshold recovers a straightforward rush: at 12, 20, 30 and 45 soldiers it won 3, 3, 4 and 0 of 12 matches.',
+    },
+    recycling: {
+      pressure_fraction: RECYCLE_PRESSURE_FRACTION,
+      note:
+        `unit_production_ratio only governs what you build next, so a colony that booms on workers and then wants an army is stuck carrying them. recycle_surplus sends surplus units home to be eaten by a queen, returning their full cost. It only applies at or above ${RECYCLE_PRESSURE_FRACTION * 100}% of the population ceiling, and never culls below min_worker_reserve.`,
+    },
+    match_end: {
+      time_limit_seconds: DEFAULT_TIME_LIMIT_SECONDS,
+      stalemate_window_seconds: STALEMATE_WINDOW_SECONDS,
+      note:
+        `A match ends when one colony loses every queen, when the clock runs out, or as a stalemate when nothing material has changed for ${STALEMATE_WINDOW_SECONDS} sim seconds. Stalemates and time limits are both resolved on score. Because the default limit is very long, most decided matches end by elimination or stalemate rather than the clock.`,
+    },
     win_conditions: {
       primary: 'kill every enemy queen',
       time_limit: 'if both colonies still have a queen at the time limit, the higher score wins',

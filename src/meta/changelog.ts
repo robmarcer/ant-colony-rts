@@ -39,6 +39,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.14.0',
+    timestamp: '2026-08-20T15:47:27+07:00',
+    title: 'Documented for an LLM to drive',
+    precision: 'commit',
+    changes: [
+      { area: 'docs', detail: 'New docs/agent-brief.md, written for a model rather than a human browsing the repo: the loop as runnable curl calls, the eight knobs ordered by how much they decide, the rule format, six traps each measured in this build, and how to read a match digest. Plus AGENTS.md, which routes an agent to the brief or to the codebase conventions depending on why it is here.' },
+      { area: 'api', detail: 'New GET /api/brief serves the brief as markdown, so a model given nothing but the base URL can bootstrap itself with no filesystem access.' },
+      { area: 'api', detail: 'recycle_surplus was listed in the schema required array but had no properties entry, so a model reading GET /api/schema would never have learned the knob exists. An earlier edit had half applied.', fix: true },
+      { area: 'api', detail: 'GET /api/schema gains sieges, recycling and match_end sections. It described a 2,500 health queen without ever mentioning that only six attackers can reach her, which is the single most important strategic fact in the game right now.', fix: true },
+      { area: 'tooling', detail: 'npm run coach now fetches the brief and uses it as its system prompt instead of a hardcoded copy, which had already drifted: it still advised that each nest adds 40 population and said nothing about sieges.', fix: true },
+      { area: 'tests', detail: 'Eleven anti-drift checks. Every knob, rule metric, soldier posture, expansion priority and operator must appear in the brief, and the queen health, attacker cap, population ceiling and recycling threshold it quotes must match config.ts. A brief that has quietly fallen behind is worse than none, because a model reads it, believes it, and plays to rules that no longer exist.' },
+    ],
+  },
+  {
     version: '0.13.0',
     timestamp: '2026-08-20T15:40:01+07:00',
     title: 'Colonies can recycle their own units',

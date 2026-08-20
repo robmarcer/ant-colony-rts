@@ -4,20 +4,25 @@
  */
 import { Simulation } from '../sim/sim.js';
 import { parseDefinition } from '../sim/definition.js';
-import { PRESETS } from '../sim/strategy.js';
+import { DEFAULT_STRATEGY, EXPANSION_PRIORITIES, PRESETS, SOLDIER_POSTURES } from '../sim/strategy.js';
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../match/runner.js';
 import { balanceFingerprint } from '../meta/fingerprint.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CORPSE_VALUE_FRACTION,
   MAP_HEIGHT,
   MAP_WIDTH,
+  MAX_NESTS_PER_COLONY,
   MIN_NEST_SEPARATION,
   QUEEN_ARMOUR,
   QUEEN_MAX_ATTACKERS,
+  RECYCLE_PRESSURE_FRACTION,
   UNITS_PER_NEST,
   UNIT_STATS,
 } from '../sim/config.js';
-import { parseDefinition as parse } from '../sim/definition.js';
+import { RULE_METRICS, RULE_OPS, parseDefinition as parse } from '../sim/definition.js';
 import { APP_VERSION, CHANGELOG, totalChanges } from '../meta/changelog.js';
 
 let failures = 0;
@@ -746,6 +751,55 @@ console.log('replay is version pinned');
   }
   check('replaying a record from before version stamping is refused', refusedUnstamped);
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
+}
+
+console.log('the agent brief matches the code');
+{
+  // A brief that has quietly fallen behind the simulation is worse than none at
+  // all: a model reads it, believes it, and plays to rules that no longer exist.
+  const briefPath = join(dirname(fileURLToPath(import.meta.url)), '../../docs/agent-brief.md');
+  const brief = readFileSync(briefPath, 'utf8');
+
+  const knobs = Object.keys(DEFAULT_STRATEGY);
+  const missingKnobs = knobs.filter((knob) => !brief.includes(knob));
+  check('the brief documents every knob', missingKnobs.length === 0, missingKnobs.join(', '));
+
+  const missingMetrics = RULE_METRICS.filter((metric) => !brief.includes(metric));
+  check('the brief documents every rule metric', missingMetrics.length === 0, missingMetrics.join(', '));
+
+  const missingPostures = SOLDIER_POSTURES.filter((posture) => !brief.includes(posture));
+  check('the brief documents every soldier posture', missingPostures.length === 0, missingPostures.join(', '));
+
+  const missingPriorities = EXPANSION_PRIORITIES.filter((p) => !brief.includes(p));
+  check('the brief documents every expansion priority', missingPriorities.length === 0, missingPriorities.join(', '));
+
+  const missingOps = RULE_OPS.filter((op) => !brief.includes(`\`${op}\``));
+  check('the brief documents every rule operator', missingOps.length === 0, missingOps.join(', '));
+
+  // Numbers that a strategy author would plan around, and that a config change
+  // would silently invalidate.
+  check(
+    'the brief quotes the real attacker cap',
+    brief.includes(`${QUEEN_MAX_ATTACKERS} attackers can reach her`),
+    `expected ${QUEEN_MAX_ATTACKERS}`,
+  );
+  check(
+    'the brief quotes the real queen health',
+    brief.includes(UNIT_STATS.queen.maxHp.toLocaleString('en-US')),
+    `expected ${UNIT_STATS.queen.maxHp}`,
+  );
+  check(
+    'the brief quotes the real population ceiling',
+    brief.includes(`${UNITS_PER_NEST} unit`),
+    `expected ${UNITS_PER_NEST}`,
+  );
+  check('the brief quotes the real nest cap', brief.includes(`(1-${MAX_NESTS_PER_COLONY})`));
+  check(
+    'the brief quotes the real recycling threshold',
+    brief.includes(`${RECYCLE_PRESSURE_FRACTION * 100}%`),
+    `expected ${RECYCLE_PRESSURE_FRACTION * 100}%`,
+  );
+  check('the brief names every starter definition it ranks', ['preset-boom', 'preset-blockade', 'example-adaptive'].every((id) => brief.includes(id)));
 }
 
 console.log('changelog');

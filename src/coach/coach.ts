@@ -59,6 +59,14 @@ const client = new Anthropic();
 
 const schema = await call<Record<string, unknown>>('/api/schema');
 
+/**
+ * The system prompt is the agent brief, fetched from the API rather than kept as
+ * a copy here. A hardcoded copy drifted out of date the moment the simulation
+ * changed, which is exactly the kind of stale advice that makes a model play
+ * badly.
+ */
+const brief = await (await fetch(`${API}/api/brief`)).text();
+
 /** Start from an existing file if there is one, otherwise from a preset. */
 async function currentDefinition(): Promise<Record<string, unknown>> {
   try {
@@ -93,18 +101,9 @@ async function digestFor(matchId: string): Promise<string> {
   return response.text();
 }
 
-const SYSTEM = `You are designing an ant colony RTS strategy for a testbed that compares strategies from different models.
+const SYSTEM = `${brief}
 
-You write one behaviour definition file. Once a match starts you have no further input: you cannot react, issue orders, or see the game. Everything your colony will ever do has to be encoded in the base knobs plus the conditional rules, so think about what the colony should do in situations you will not be there to see.
-
-How rules work: every rule whose conditions all hold is applied on top of base in list order, and later rules override earlier ones. Put general phase rules first and emergency overrides last. Rules are re-evaluated once per sim second.
-
-Three things that decide most matches:
-- A trickle of single soldiers walking into an enemy base dies for nothing. If you intend to attack, hold soldiers at home with aggression 0 and use a rule on my_soldiers to commit the whole group at once.
-- Never expanding loses on production. Each nest is one more build slot and 40 more units of population, so target_nests 1 caps you well below what the map can feed. Every strategy that wins consistently expands.
-- Banked food is nearly worthless in the score. If the stockpile is climbing while the population is capped, the answer is another nest, not more saving.
-
-Read the match digests carefully. A rule marked NEVER FIRED means its condition was never true, which usually means the threshold is wrong, not that the idea is wrong.`;
+You are the agent that brief is addressed to. Return a complete revised definition, not a patch.`;
 
 function buildPrompt(definition: Record<string, unknown>, series: SeriesResponse, digests: string[], round: number): string {
   return [
