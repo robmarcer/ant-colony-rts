@@ -103,6 +103,8 @@ export function saveMatch(record: MatchRecord): MatchRecord {
     seed: record.seed,
     a: record.colonies[0].definitionId,
     b: record.colonies[1].definitionId,
+    aVersion: record.colonies[0].version,
+    bVersion: record.colonies[1].version,
     winner: record.result.winnerName,
     reason: record.result.reason,
     scores: record.result.scores,

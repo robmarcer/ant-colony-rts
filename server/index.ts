@@ -41,6 +41,7 @@ import { APP_VERSION, CHANGELOG, totalChanges } from '../src/meta/changelog.js';
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../src/match/runner.js';
 import { balanceFingerprint } from '../src/meta/fingerprint.js';
 import { runRoundRobin, runSeries } from '../src/match/tournament.js';
+import { buildLadder } from '../src/match/ladder.js';
 import {
   NotFound,
   ROOT,
@@ -102,6 +103,8 @@ app.get('/api', (_req, res) => {
       'POST /api/series': 'run the same pairing over several seeds: {a, b, seeds?, swapSides?}',
       'POST /api/round-robin': 'run every pairing: {definitions?, seeds?}',
       'GET /api/stats/:id': 'aggregate win/loss record for one definition across saved matches',
+      'GET /api/ladder': 'ratings across every definition, from every comparable stored match',
+      'POST /api/ladder/sweep': 'play a round robin, save it, and return the updated ladder',
     },
   });
 });
@@ -420,6 +423,32 @@ app.post('/api/round-robin', handler((req, res) => {
     return;
   }
   res.json(runRoundRobin({ definitions: chosen, seeds, timeLimitSeconds }));
+}));
+
+app.get('/api/ladder', handler((_req, res) => {
+  res.json(buildLadder(listMatches({ limit: 100000 })));
+}));
+
+app.post('/api/ladder/sweep', handler((req, res) => {
+  const { definitions, seeds = ['1'], timeLimitSeconds } = req.body ?? {};
+  const all = loadAllDefinitions().map((loaded) => loaded.definition);
+  const chosen = Array.isArray(definitions) && definitions.length
+    ? all.filter((definition) => definitions.includes(definition.id))
+    : all;
+  const pairings = (chosen.length * (chosen.length - 1)) / 2;
+  const limit = Number(timeLimitSeconds ?? DEFAULT_TIME_LIMIT_SECONDS);
+  const refusal = tooExpensive(pairings * seeds.length * 2, limit, `npm run ladder -- --sweep --seeds ${seeds.join(',')}`);
+  if (refusal) {
+    res.status(400).json({ error: refusal });
+    return;
+  }
+  for (let i = 0; i < chosen.length; i++) {
+    for (let j = i + 1; j < chosen.length; j++) {
+      const series = runSeries({ definitions: [chosen[i], chosen[j]], seeds, timeLimitSeconds: limit, swapSides: true });
+      for (const record of series.records) saveMatch(record);
+    }
+  }
+  res.json(buildLadder(listMatches({ limit: 100000 })));
 }));
 
 app.get('/api/stats/:id', handler((req, res) => {

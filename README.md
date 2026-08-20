@@ -367,6 +367,29 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - Corpse piles merge by proximity to the first corpse in the pile; the pile does
   not drift toward the centre of the fighting.
 
+## The ladder
+
+```bash
+npm run ladder                                   # rank from stored matches
+npm run ladder -- --sweep --seeds 1,2 --time 900 # play a round robin first
+```
+
+Ratings are Bradley-Terry strengths on an Elo-like scale, mean 1500, with a 400
+point gap meaning the higher side is expected to win about 10 games in 11. Also
+`GET /api/ladder`, and `POST /api/ladder/sweep` to play and rank in one call.
+
+Two properties worth knowing, both asserted in the self test:
+
+- **Order independent.** Elo depends on the sequence matches were played in, so
+  the same results processed differently give different ratings. Bradley-Terry
+  makes the ladder a pure function of the match set, so recomputing always gives
+  the same answer.
+- **Only comparable matches count.** Ratings pool only matches played under the
+  running balance numbers. A change to a unit cost makes older results a
+  different game, and the ladder reports how many it ignored rather than
+  averaging across them. Definitions are ranked per version, so revising one
+  does not inherit its old rating.
+
 ## Map fairness
 
 Food is generated in mirrored pairs about the map centre so both colonies face an
@@ -418,6 +441,8 @@ than relying on there being none.
 - soldiers on `guard_food` hold their post rather than chasing, are not posted on
   the enemy doorstep, are released when their pile runs out, and measurably deny
   the opponent food compared with sitting at home
+- ladder ratings do not depend on match order, ignore matches from other balance
+  numbers, rank per definition version, and give equal ratings for equal records
 - a definition played against itself is not decided by which side it played, and
   the interval maths behind that verdict behaves at small and large samples
 - the agent brief documents every knob, metric, posture, priority and operator,

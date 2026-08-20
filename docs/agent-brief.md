@@ -185,10 +185,29 @@ Look at, in this order:
 
 ## What good looks like right now
 
-Measured over a 144 match round robin at a 900 second limit, best first:
-`preset-boom` 88%, `preset-blockade` 81%, `preset-scout` 69%,
-`example-adaptive` 69%, `example-mass-rush` 50%, `preset-balanced` 44%,
-`preset-turtle` 31%, `preset-rush` 19%, `preset-harass` 0%.
+Ask the ladder rather than trusting this list, since it is a snapshot:
+
+```bash
+curl localhost:8787/api/ladder
+```
+
+At the time of writing, over 144 comparable matches, with ratings on an Elo-like
+scale and 95% intervals on the win rate:
+
+| rating | definition | win rate |
+|---|---|---|
+| 1971 | preset-boom | 88% (72-95%) |
+| 1889 | preset-blockade | 81% (65-91%) |
+| 1816 | example-adaptive | 75% (58-87%) |
+| 1680 | preset-scout | 63% (45-77%) |
+| 1544 | example-mass-rush | 50% (34-66%) |
+| 1508 | preset-balanced | 47% (31-64%) |
+| 1266 | preset-turtle | 28% (16-45%) |
+| 1057 | preset-rush | 16% (7-32%) |
+| 769 | preset-harass | 3% (1-16%) |
+
+Note how wide those intervals are at 32 games each. Beating `preset-balanced`
+once proves nothing.
 
 Economy and area denial currently beat committed aggression. If you want to beat
 `preset-boom`, note that it expands to four nests and has almost no army:

@@ -7,6 +7,8 @@ import { parseDefinition } from '../sim/definition.js';
 import { DEFAULT_STRATEGY, EXPANSION_PRIORITIES, PRESETS, SOLDIER_POSTURES } from '../sim/strategy.js';
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../match/runner.js';
 import { runMirror, winRateInterval } from '../match/tournament.js';
+import { buildLadder } from '../match/ladder.js';
+import type { MatchSummaryRow } from '../match/types.js';
 import { balanceFingerprint } from '../meta/fingerprint.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -752,6 +754,77 @@ console.log('replay is version pinned');
   }
   check('replaying a record from before version stamping is refused', refusedUnstamped);
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
+}
+
+console.log('the ladder');
+{
+  const hash = balanceFingerprint();
+  const row = (a: string, b: string, winner: string | null, balanceHash = hash): MatchSummaryRow => ({
+    id: `${a}-${b}-${winner}-${Math.round(a.length + b.length)}`,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    appVersion: APP_VERSION,
+    balanceHash,
+    aVersion: 1,
+    bVersion: 1,
+    seed: '1',
+    a,
+    b,
+    winner,
+    reason: 'colony_eliminated',
+    scores: [1, 0],
+    durationSeconds: 100,
+  });
+
+  // A clear hierarchy: strong beats mid, mid beats weak, strong beats weak.
+  const hierarchy = [
+    ...Array.from({ length: 8 }, () => row('strong', 'mid', 'strong')),
+    ...Array.from({ length: 8 }, () => row('mid', 'weak', 'mid')),
+    ...Array.from({ length: 8 }, () => row('strong', 'weak', 'strong')),
+  ];
+  const ladder = buildLadder(hierarchy);
+  check('the ladder ranks a clear hierarchy correctly', ladder.rows.map((r) => r.id).join(',') === 'strong,mid,weak', ladder.rows.map((r) => `${r.id}:${r.rating}`).join(' '));
+  check('a dominant competitor rates above a losing one', ladder.rows[0].rating > ladder.rows[2].rating + 200);
+
+  // The whole reason for Bradley-Terry over Elo: order must not matter.
+  const shuffled = [...hierarchy].reverse();
+  const other = buildLadder(shuffled);
+  check(
+    'ratings do not depend on the order matches were played',
+    JSON.stringify(ladder.rows.map((r) => [r.id, r.rating])) === JSON.stringify(other.rows.map((r) => [r.id, r.rating])),
+  );
+
+  // Evenly matched competitors must not be separated by noise in the maths.
+  const even = buildLadder([
+    ...Array.from({ length: 6 }, () => row('x', 'y', 'x')),
+    ...Array.from({ length: 6 }, () => row('x', 'y', 'y')),
+  ]);
+  check('an even record gives equal ratings', even.rows[0].rating === even.rows[1].rating, even.rows.map((r) => `${r.id}:${r.rating}`).join(' '));
+
+  const drawn = buildLadder(Array.from({ length: 4 }, () => row('p', 'q', null)));
+  check('draws count for both sides', drawn.rows.every((r) => r.draws === 4 && r.wins === 0));
+  check('all draws leaves ratings level', drawn.rows[0].rating === drawn.rows[1].rating);
+
+  // Comparability: results from other balance numbers are a different game.
+  const mixed = buildLadder([...hierarchy, row('weak', 'strong', 'weak', 'deadbeef')]);
+  check('matches from other balance numbers are ignored', mixed.matchesIgnored === 1 && mixed.matchesConsidered === hierarchy.length);
+  check(
+    'and cannot change the ranking',
+    mixed.rows.map((r) => r.id).join(',') === 'strong,mid,weak',
+  );
+
+  // Revising a definition must not inherit the old rating.
+  const versioned = buildLadder([
+    ...Array.from({ length: 6 }, () => ({ ...row('same', 'other', 'same'), aVersion: 1 })),
+    ...Array.from({ length: 6 }, () => ({ ...row('same', 'other', 'other'), aVersion: 2 })),
+  ]);
+  check(
+    'a definition is ranked per version',
+    versioned.rows.filter((r) => r.id === 'same').length === 2,
+    versioned.rows.map((r) => r.key).join(' '),
+  );
+
+  check('a mirror match is not used for ranking', buildLadder([row('solo', 'solo', 'solo')]).rows.length === 0);
+  check('win rates carry an interval', ladder.rows.every((r) => r.low <= r.winRate && r.winRate <= r.high));
 }
 
 console.log('map fairness');

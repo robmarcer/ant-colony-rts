@@ -7,6 +7,7 @@
  */
 import { NotReplayable, replayRecord, runMatch } from '../match/runner.js';
 import { runMirror, runRoundRobin, runSeries, winRateInterval } from '../match/tournament.js';
+import { buildLadder } from '../match/ladder.js';
 import {
   ensureStarterDefinitions,
   listDefinitionIds,
@@ -79,6 +80,44 @@ if (args.list) {
     const { definition } = loadDefinition(id);
     console.log(`${id.padEnd(20)} v${definition.version ?? 1} by ${definition.author ?? '?'} (${definition.rules.length} rules)`);
   }
+  process.exit(0);
+}
+
+if (args.ladder) {
+  // Optionally play a sweep first, so a fresh install has something to rank.
+  if (args.sweep) {
+    const seeds = String(args.seeds ?? '1,2').split(',');
+    const defs = loadAllDefinitions().map((loaded) => loaded.definition);
+    const timeLimitSeconds = Number(args.time ?? 900);
+    console.error(`sweeping ${defs.length} definitions over ${seeds.length} seeds...`);
+    for (let i = 0; i < defs.length; i++) {
+      for (let j = i + 1; j < defs.length; j++) {
+        const series = runSeries({ definitions: [defs[i], defs[j]], seeds, timeLimitSeconds, swapSides: true });
+        for (const record of series.records) saveMatch(record);
+      }
+    }
+  }
+
+  const ladder = buildLadder(listMatches({ limit: 100000 }));
+  console.log(`ladder over ${ladder.matchesConsidered} comparable matches, balance ${ladder.balanceHash}`);
+  if (ladder.matchesIgnored > 0) {
+    console.log(`${ladder.matchesIgnored} stored matches ignored: played under different balance numbers`);
+  }
+  if (ladder.rows.length === 0) {
+    console.log('nothing to rank yet. Run with --sweep to play a round robin first.');
+    process.exit(0);
+  }
+  console.log('');
+  console.log('rating  definition               ver  games   w-l-d      win rate     95% interval');
+  for (const row of ladder.rows) {
+    console.log(
+      `${String(row.rating).padStart(6)}  ${row.id.padEnd(24)} ${String(row.version).padStart(3)} ` +
+        `${String(row.games).padStart(6)}   ${`${row.wins}-${row.losses}-${row.draws}`.padEnd(10)} ` +
+        `${(row.winRate * 100).toFixed(1).padStart(6)}%   ${`${(row.low * 100).toFixed(0)}-${(row.high * 100).toFixed(0)}%`.padStart(12)}`,
+    );
+  }
+  console.log('');
+  console.log('A gap of 400 rating points means the higher is expected to win about 10 games in 11.');
   process.exit(0);
 }
 

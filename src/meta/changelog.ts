@@ -39,6 +39,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.18.0',
+    timestamp: '2026-08-20T17:55:01+07:00',
+    title: 'A ladder with ratings and intervals',
+    precision: 'commit',
+    changes: [
+      { area: 'api', detail: 'New GET /api/ladder ranks every definition from every comparable stored match, and POST /api/ladder/sweep plays a round robin and returns the updated ladder. npm run ladder does the same on the CLI, with --sweep to populate first.' },
+      { area: 'tooling', detail: 'Bradley-Terry strengths rather than Elo, on an Elo-like scale with mean 1500. Elo depends on the order matches were played, so the same results processed differently give different ratings. Bradley-Terry makes the ladder a pure function of the match set, which is asserted directly by ranking a set of results and then its reverse.' },
+      { area: 'tooling', detail: 'Ratings pool only matches played under the running balance numbers, and report how many were ignored. Averaging across a balance change would produce a confident number about a game that no longer exists. On the first run this correctly ignored 7 older matches.' },
+      { area: 'tooling', detail: 'Definitions are ranked per version, so revising one does not inherit its old rating. Match index rows now carry both definitions versions.' },
+      { area: 'tooling', detail: 'Win rates come with 95% Wilson intervals, reusing the function added for the fairness check so a rating interval and a fairness interval mean the same thing. At 32 games a definition interval is around 20 points wide, which is the point: one win proves nothing.' },
+      { area: 'balance', detail: 'First ladder over 144 comparable matches: preset-boom 1971, preset-blockade 1889, example-adaptive 1816, preset-scout 1680, example-mass-rush 1544, preset-balanced 1508, preset-turtle 1266, preset-rush 1057, preset-harass 769.' },
+      { area: 'tests', detail: 'Eleven checks: a clear hierarchy ranks correctly, order does not matter, an even record gives exactly equal ratings, draws count half to each side, other balance numbers are excluded and cannot change the ranking, versions are ranked separately, and mirror matches are not used for ranking.' },
+      { area: 'docs', detail: 'The agent brief now points a model at GET /api/ladder rather than a hardcoded table, and shows how wide the intervals are so it does not read one result as signal.' },
+    ],
+  },
+  {
     version: '0.17.0',
     timestamp: '2026-08-20T17:42:15+07:00',
     title: 'Map fairness is measured, not assumed',

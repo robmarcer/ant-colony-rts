@@ -78,6 +78,9 @@ export interface MatchSummaryRow {
   createdAt: string;
   appVersion?: string;
   balanceHash?: string;
+  /** Definition versions, so revising a definition does not inherit its rating. */
+  aVersion?: number;
+  bVersion?: number;
   /**
    * Whether this record can still be reproduced by the running code. Computed
    * when the row is read, not when it was written, since it is a statement
