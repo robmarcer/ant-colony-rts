@@ -49,7 +49,13 @@ button:hover { border-color: var(--muted); }
 button.primary { background: var(--a); color: #1b1408; border-color: var(--a); font-weight: 700; }
 button.active { border-color: var(--a); color: var(--a); }
 
-main {
+/*
+ * Scoped to the match page. This was a bare `main` selector, so the reading
+ * pages inherited a two column grid built for the viewer: their content landed
+ * in the first track and the 380px sidebar track sat empty, leaving a 9,570
+ * character brief to be read through a 451px porthole.
+ */
+main.match {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) 380px;
   gap: 12px;
@@ -124,6 +130,7 @@ canvas {
   margin: 0 auto;
   padding: 16px 20px 40px;
 }
+.reading > div { min-width: 0; }
 .reading h1 { font-size: 20px; margin: 12px 0 4px; }
 .reading pre {
   background: var(--panel);
@@ -134,8 +141,10 @@ canvas {
   word-break: break-word;
   font-size: 12px;
   line-height: 1.5;
-  max-height: 70vh;
-  overflow-y: auto;
+  /*
+   * Deliberately no max-height. Capping it put a second scrollbar inside a page
+   * that barely scrolled, so the reader scrolled a box instead of a document.
+   */
 }
 .reading code {
   background: var(--panel-2);
@@ -205,5 +214,5 @@ canvas {
 .summary .formula { color: var(--muted); font-size: 11px; }
 
 @media (max-width: 1000px) {
-  main { grid-template-columns: 1fr; }
+  main.match { grid-template-columns: 1fr; }
 }
