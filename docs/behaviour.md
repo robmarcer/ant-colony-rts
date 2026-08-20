@@ -116,8 +116,39 @@ What pushing soldiers do.
 
 - `defend_nest` holds every soldier at home and ignores aggression.
 - `escort_workers` shadows the friendly worker that is furthest from the nest.
-- `harass_enemy_workers` hunts the nearest enemy worker anywhere on the map.
-- `attack_enemy_nest` marches on the enemy queen.
+- `harass_enemy_workers` hunts the nearest enemy worker anywhere on the map, and
+  prefers a queen walking to a founding site if one is within about 90 cells.
+- `attack_enemy_nest` marches on the nearest enemy nest.
+- `guard_food` posts soldiers on food piles and kills whatever comes to collect
+  it. See below.
+
+#### guard_food
+
+Area denial. Soldiers pick a pile, stand on it, and fight only what comes within
+12 cells of that post. They do not chase: a guard that leaves its post to chase a
+worker is not guarding anything.
+
+Post selection prefers, in rough order of weight: piles enemy workers are
+currently working, then large piles, then piles closer to the enemy than to you,
+minus a penalty for distance from your own nests and, if `risk_tolerance` is low,
+a penalty for sitting near their nest. Guards are assigned in pairs, because a
+lone soldier loses to four or five massed workers, and coverage grows with army
+size up to six piles.
+
+A post is held until the pile is exhausted. That stickiness is deliberate. An
+earlier version re-chose every tick and guards spent the match walking between
+piles, with 3 of 28 soldiers actually standing on one.
+
+Measured against an otherwise identical definition sitting at home, over four
+seeds against `preset-boom`: the opponent gathered 13,710 food instead of 14,878,
+lost 423 workers instead of 48, and cost 20 soldiers to do it. `preset-blockade`
+uses this posture and sits fourth of nine in the field at 59%.
+
+Two things worth knowing. Denial does not starve an opponent on this map: there
+are around sixty piles, so even six guarded is a minority, and the effect is a
+dent in their income rather than a stranglehold. And because the map is a closed
+system, killing workers deep in their half hands them the corpses, so guarding
+contested ground near your own side is worth more than guarding theirs.
 
 ### expansion_priority
 
@@ -235,8 +266,9 @@ consumed and nothing is lost. Three consequences worth planning around:
   own nest is worth far more than winning the same fight beside theirs, because
   the loser's army is now food and whoever has workers nearby collects it.
 - Piles are ordinary food sources, so `largest_food_first` sends workers to a
-  large battlefield ahead of a fresh cluster, and `contest_enemy_food` will fight
-  over one in the middle of the map.
+  large battlefield ahead of a fresh cluster, `contest_enemy_food` will fight
+  over one in the middle of the map, and `guard_food` will post soldiers on one.
+  Denying an opponent the battlefield they just lost an army on is a real play.
 - The clusters get stripped, but the energy does not leave. Late game, most of
   the map's food is either embodied in living units or lying on old
   battlefields. Ground you fought over is ground worth keeping workers on.

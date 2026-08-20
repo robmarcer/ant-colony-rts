@@ -1,0 +1,21 @@
+{
+  "id": "preset-blockade",
+  "name": "preset-blockade",
+  "author": "hand",
+  "version": 1,
+  "notes": "Built-in blockade preset. Static knobs, no rules. Useful as a baseline opponent.",
+  "base": {
+    "unit_production_ratio": {
+      "worker": 0.6,
+      "soldier": 0.4
+    },
+    "aggression": 0.6,
+    "expansion_priority": "nearest_food_first",
+    "min_worker_reserve": 12,
+    "soldier_posture": "guard_food",
+    "risk_tolerance": 0.5,
+    "target_nests": 2
+  },
+  "rules": [],
+  "updatedAt": "2026-08-20T07:53:33.051Z"
+}

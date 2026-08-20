@@ -343,6 +343,7 @@ export class Simulation {
       foundingSite: null,
       nestId: null,
       build: null,
+      guardFoodId: null,
     };
     this.units.set(unit.id, unit);
     return unit;
@@ -596,6 +597,9 @@ export class Simulation {
         unit.targetFoodId = null;
         if (unit.state === 'gathering' || unit.state === 'moving') unit.state = 'idle';
       }
+      // Soldiers posted here need releasing too, or the field points at a pile
+      // that no longer exists.
+      if (unit.guardFoodId === source.id) unit.guardFoodId = null;
     }
   }
 

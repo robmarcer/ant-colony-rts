@@ -1,10 +1,37 @@
 # Changelog
 
-Current version: **0.9.0**. 9 releases, 67 recorded changes.
+Current version: **0.10.0**. 10 releases, 75 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.10.0 — Soldiers can guard food
+
+2026-08-20 15:01 (UTC+07:00) · committed · 8 changes
+
+**Simulation**
+
+- New soldier_posture guard_food: soldiers post on food piles and kill whatever comes to collect it, denying the source rather than fighting for territory. New preset-blockade uses it, entering the field fourth of nine at 59%.
+- Fix: Removing a food source now releases soldiers guarding it as well as workers gathering from it. Previously the guard field pointed at a deleted pile.
+
+**Unit AI**
+
+- Fix: Guards are leashed to 12 cells of their post and do not chase. Without a leash the first version had guards following workers across the map, with 2 of 17 soldiers actually standing on the pile they were meant to be denying and several posted 11 cells from the enemy nest.
+- Fix: Post selection weights enemy worker activity at the pile first, then size, then how much closer it is to them than to us, minus distance from our own nests and, at low risk_tolerance, proximity to their nest. The denial term is capped both ways, because uncapped it always picks the pile touching the enemy nest, which is not a post but a funeral.
+- Fix: A post is sticky and held until the pile is exhausted. Choosing fresh every tick made guards chase whichever pile momentarily had the most enemy workers, and only 3 of 28 ended up on a pile. Stickiness was the change that made the posture work at all.
+
+**Balance**
+
+- Measured against an otherwise identical definition sitting at home, four seeds against preset-boom: opponent income fell from 14,878 to 13,710, their worker losses rose from 48 to 423, at a cost of 20 soldiers, and it took a win off preset-boom where the control took none.
+
+**Tests**
+
+- Seven checks: guarding denies food and multiplies worker kills against a control, soldiers take up posts, a guard that has had time to arrive is on its pile, none are posted on the enemy doorstep, posts are held rather than chased, and a guard is released the moment its pile runs out.
+
+**Docs**
+
+- Documented in docs/behaviour.md, including the two limits: sixty-odd piles on the map means denial dents income rather than strangling it, and in a closed system killing workers deep in their half hands them the corpses, so contested ground near your own side is worth more.
 
 ## 0.9.0 — Rules can hold, and flapping is reported
 

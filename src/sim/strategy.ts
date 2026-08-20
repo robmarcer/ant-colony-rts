@@ -19,6 +19,7 @@ export const SOLDIER_POSTURES = [
   'escort_workers',
   'harass_enemy_workers',
   'attack_enemy_nest',
+  'guard_food',
 ] as const;
 
 export type ExpansionPriority = (typeof EXPANSION_PRIORITIES)[number];
@@ -94,6 +95,15 @@ export const PRESETS: Record<string, StrategyConfig> = {
     soldier_posture: 'defend_nest',
     risk_tolerance: 0.15,
     target_nests: 1,
+  },
+  blockade: {
+    unit_production_ratio: { worker: 0.6, soldier: 0.4 },
+    aggression: 0.6,
+    expansion_priority: 'nearest_food_first',
+    min_worker_reserve: 12,
+    soldier_posture: 'guard_food',
+    risk_tolerance: 0.5,
+    target_nests: 2,
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -211,7 +221,7 @@ export const STRATEGY_JSON_SCHEMA = {
       type: 'string',
       enum: [...SOLDIER_POSTURES],
       description:
-        'What pushing soldiers do. defend_nest: hold the nest (overrides aggression). escort_workers: shadow the worker furthest from home. harass_enemy_workers: hunt enemy workers. attack_enemy_nest: march on the enemy queen.',
+        'What pushing soldiers do. defend_nest: hold the nest (overrides aggression). escort_workers: shadow the worker furthest from home. harass_enemy_workers: hunt enemy workers, preferring a queen walking to a founding site. attack_enemy_nest: march on the nearest enemy nest. guard_food: post soldiers on the food the enemy is best placed to reach and kill their workers on arrival, denying the source rather than fighting for territory.',
     },
     risk_tolerance: {
       type: 'number',

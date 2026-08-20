@@ -9,6 +9,14 @@ import {
   ARRIVE_EPSILON,
   CONTEST_MAX_HAUL,
   DT,
+  GUARDS_PER_PILE,
+  GUARD_ACTIVITY_RADIUS,
+  GUARD_DENIAL_CAP,
+  GUARD_LEASH,
+  GUARD_MAX_RANGE,
+  GUARD_MIN_FOOD,
+  GUARD_OWN_HALF_PENALTY_CAP,
+  MAX_GUARDED_PILES,
   GATHER_RADIUS,
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -433,6 +441,33 @@ function soldierAi(sim: Simulation, unit: Unit): void {
     return engage(sim, unit, closest);
   }
 
+  // Guarding is not a push, it is a post. Handled separately because a guard
+  // must not chase: it fights what comes to the pile and then goes back.
+  if (pushing && strategy.soldier_posture === 'guard_food') {
+    const post = guardPost(sim, unit, strategy);
+    let target: Unit | null = null;
+    let bestDist = Infinity;
+    for (const enemy of sim.unitsNear(unit.owner === 0 ? 1 : 0, post, GUARD_LEASH)) {
+      if (enemy.type === 'queen') continue;
+      const d = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
+      if (d < bestDist) {
+        bestDist = d;
+        target = enemy;
+      }
+    }
+    if (target) return engage(sim, unit, target);
+
+    // Stand slightly off the pile so guards do not stack on one point.
+    const station: Vec = {
+      x: post.x + Math.cos(index * 2.4) * 2,
+      y: post.y + Math.sin(index * 2.4) * 2,
+    };
+    unit.targetEnemyId = null;
+    unit.state = 'guarding';
+    moveToward(unit, station, stats.speed);
+    return;
+  }
+
   if (pushing) {
     const opportunistic = sim.nearestEnemy(unit, 12);
     if (opportunistic && willEngage(sim, unit, strategy)) return engage(sim, unit, opportunistic);
@@ -491,6 +526,8 @@ function defendAnchor(sim: Simulation, unit: Unit): Vec | null {
 function pushTarget(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
   const enemyColony = sim.enemyColony(unit.owner);
   switch (strategy.soldier_posture) {
+    case 'guard_food':
+      return guardPost(sim, unit, strategy);
     case 'harass_enemy_workers': {
       // A queen walking to a founding site is the best prize on the map: 200
       // food and 60 seconds of build time, slow, and usually unescorted. A
@@ -534,6 +571,75 @@ function pushTarget(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec 
       return queen ? { x: queen.x, y: queen.y } : enemyColony.homeNest;
     }
   }
+}
+
+/**
+ * Area denial. Pick a food pile the enemy is better placed to reach than we are,
+ * stand on it, and kill their workers when they arrive.
+ *
+ * The pile has to be worth denying and reachable enough to be supportable: a
+ * guard parked 150 cells from home just dies alone, which is the same mistake
+ * contest_enemy_food used to make with workers. risk_tolerance decides how close
+ * to the enemy a colony is willing to post a guard.
+ *
+ * Guards are spread across a few piles in pairs rather than stacked on one,
+ * because a lone soldier loses to four or five massed workers.
+ */
+function guardPost(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
+  const colony = sim.colonies[unit.owner];
+  const enemy = sim.enemyColony(colony.id);
+
+  // Hold the assigned post until the pile is actually gone. A guard that
+  // re-picks every tick is not guarding anything.
+  if (unit.guardFoodId !== null) {
+    const held = sim.food.get(unit.guardFoodId);
+    if (held && held.amount >= GUARD_MIN_FOOD) return { x: held.x, y: held.y };
+    unit.guardFoodId = null;
+  }
+
+  const scored: Array<{ point: Vec; score: number; id: number }> = [];
+  for (const known of colony.knownFood.values()) {
+    if (known.estAmount < GUARD_MIN_FOOD) continue;
+    const fromUs = sim.distanceToNearestNest(colony.id, known);
+    const fromThem = sim.distanceToNearestNest(enemy.id, known);
+    // Positive when the pile is closer to them than to us, which is the food
+    // worth taking off them. Capped both ways: uncapped, the best denial score
+    // always belongs to the pile touching their nest, and supportability has to
+    // win that argument.
+    const denial = Math.max(-GUARD_OWN_HALF_PENALTY_CAP, Math.min(GUARD_DENIAL_CAP, fromUs - fromThem));
+    const exposure = Math.max(0, 60 - fromThem) / 60;
+
+    // The strongest signal by far: enemy workers actually working this pile. A
+    // guard on a pile nobody wants denies nothing, however valuable the pile.
+    let activity = 0;
+    for (const worker of sim.unitsNear(enemy.id, known, GUARD_ACTIVITY_RADIUS)) {
+      if (worker.type === 'worker') activity++;
+    }
+
+    const score =
+      1.5 * activity +
+      0.04 * known.estAmount +
+      0.5 * denial -
+      0.35 * fromUs -
+      5 * Math.max(0, fromUs - GUARD_MAX_RANGE) -
+      exposure * 60 * (1 - strategy.risk_tolerance);
+    scored.push({ point: { x: known.x, y: known.y }, score, id: known.foodId });
+  }
+
+  if (scored.length === 0) {
+    // Nothing known worth guarding, so hold the nest rather than wander.
+    unit.guardFoodId = null;
+    return sim.nearestNest(colony.id, unit) ?? colony.homeNest;
+  }
+
+  // Sort by value, then by id so equal scores resolve the same way every tick.
+  scored.sort((a, b) => b.score - a.score || a.id - b.id);
+  // Cover as many piles as the army can actually hold in pairs.
+  const coverage = Math.max(1, Math.min(MAX_GUARDED_PILES, Math.floor(sim.soldierCount(colony.id) / GUARDS_PER_PILE)));
+  const piles = scored.slice(0, coverage);
+  const slot = Math.floor(sim.soldierRank(unit) / GUARDS_PER_PILE) % piles.length;
+  unit.guardFoodId = piles[slot].id;
+  return piles[slot].point;
 }
 
 /**

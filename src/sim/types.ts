@@ -49,6 +49,12 @@ export interface Unit {
   nestId: number | null;
   /** Queens only. Her own build slot; every queen produces independently. */
   build: BuildJob | null;
+  /**
+   * Soldiers on guard_food duty: the pile this one is posted to. Sticky, because
+   * choosing the post fresh every tick made guards chase whichever pile happened
+   * to have the most enemy workers that instant and never actually hold one.
+   */
+  guardFoodId: number | null;
 }
 
 /**

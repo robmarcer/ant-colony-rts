@@ -244,9 +244,9 @@ The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
 matches are not degenerate. Current state, measured over a round robin of the
 starter definitions across two seeds (112 matches):
 
-- 45% of matches were decided by eliminating a colony, the rest on score at the
+- 40% of matches were decided by eliminating a colony, the rest on score at the
   time limit.
-- Win rates spread from 14% to 93%.
+- Win rates spread from 6% to 91% across nine definitions.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
@@ -290,7 +290,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 81 properties, including:
+`npm run selftest` asserts 88 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk
@@ -313,6 +313,9 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 - a stalemated match ends early while a decisive one is untouched
 - `min_hold_seconds` stops a rule flapping, and a definition without it is
   unaffected
+- soldiers on `guard_food` hold their post rather than chasing, are not posted on
+  the enemy doorstep, are released when their pile runs out, and measurably deny
+  the opponent food compared with sitting at home
 - the changelog is well formed: unique semver versions, parseable timestamps
   carrying an offset, newest first, every entry has changes, `APP_VERSION`
   matches the newest entry, and a reconstructed entry never claims a commit

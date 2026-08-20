@@ -148,6 +148,42 @@ export const GATHER_RADIUS = 1.0;
 export const CONTEST_MAX_HAUL = 100;
 
 /**
+ * How far from its own nests a colony will post soldiers on guard_food duty.
+ * Guards do not haul, so they can range further than workers, but a guard
+ * standing on a pile 150 cells from home is a soldier that will be killed alone
+ * and never supported. Same lesson as CONTEST_MAX_HAUL above.
+ */
+export const GUARD_MAX_RANGE = 110;
+/** Below this, a pile is not worth posting a soldier on. */
+export const GUARD_MIN_FOOD = 40;
+/** Soldiers assigned per guarded pile, so a guard is not killed alone. */
+export const GUARDS_PER_PILE = 2;
+/**
+ * Most piles a colony will spread guards across at once. Coverage scales with
+ * army size up to this: guarding three piles out of the sixty on the map denies
+ * an opponent essentially nothing, which is what the first version of this
+ * posture measured.
+ */
+export const MAX_GUARDED_PILES = 6;
+/** Radius in which enemy workers count as using a pile. */
+export const GUARD_ACTIVITY_RADIUS = 15;
+/**
+ * How far from its post a guard will fight. This is a leash, and it is the whole
+ * point of the posture: without it a guard chases the first worker it sees and
+ * drifts across the map, which measured at 2 of 17 soldiers actually standing on
+ * the pile they were meant to be denying, several of them 11 cells from the
+ * enemy nest.
+ */
+export const GUARD_LEASH = 12;
+/**
+ * Caps on how much the denial term can swing a post choice. Uncapped, the pile
+ * with the highest denial value is always the one touching the enemy's nest,
+ * which is not a guard post, it is a funeral. Supportability has to dominate.
+ */
+export const GUARD_DENIAL_CAP = 40;
+export const GUARD_OWN_HALF_PENALTY_CAP = 30;
+
+/**
  * Corpses drop this fraction of the unit's food cost, plus whatever it carried.
  *
  * At 1.0 the map is a closed system: the total energy on it never changes. Food

@@ -302,6 +302,94 @@ console.log('closed system');
   }
 }
 
+console.log('guarding food');
+{
+  const withPosture = (posture: string, aggression: number) =>
+    parse(
+      {
+        id: 'g',
+        name: 'g',
+        base: {
+          ...PRESETS.balanced,
+          aggression,
+          soldier_posture: posture,
+          unit_production_ratio: { worker: 0.6, soldier: 0.4 },
+        },
+        rules: [],
+      },
+      'g',
+    ).definition;
+
+  const guarding = withPosture('guard_food', 0.6);
+  const control = withPosture('defend_nest', 0);
+  const victim = def('v', 'boom');
+
+  const tally = (attacker: typeof guarding) => {
+    let theirs = 0;
+    let killed = 0;
+    for (const seed of ['1', '2']) {
+      const sim = new Simulation({ seed, timeLimitSeconds: 900, definitions: [attacker, victim] });
+      sim.run(9001);
+      theirs += sim.colonies[1].lifetimeFoodGathered;
+      killed += sim.colonies[1].unitsLost.worker;
+    }
+    return { theirs, killed };
+  };
+
+  const guarded = tally(guarding);
+  const baseline = tally(control);
+  check(
+    'guarding denies the enemy food compared with sitting at home',
+    guarded.theirs < baseline.theirs,
+    `${Math.round(guarded.theirs)} vs ${Math.round(baseline.theirs)}`,
+  );
+  check(
+    'guarding kills far more enemy workers',
+    guarded.killed > baseline.killed * 2,
+    `${guarded.killed} vs ${baseline.killed}`,
+  );
+
+  const sim = new Simulation({ seed: '1', timeLimitSeconds: 900, definitions: [guarding, victim] });
+  sim.run(4000);
+  const guards = sim.unitsOf(0).filter((u) => u.type === 'soldier' && u.guardFoodId !== null);
+  check('soldiers take up posts on food piles', guards.length > 0, `${guards.length} posted`);
+  // Only guards that have had time to walk there: a soldier built ten seconds
+  // ago is legitimately still in transit across a 200 cell map.
+  const settled = guards.filter((guard) => sim.tick - guard.bornTick > 150 * 10);
+  check(
+    'a guard that has had time to arrive stands on its pile',
+    settled.length > 0 &&
+      settled.every((guard) => {
+        const pile = sim.food.get(guard.guardFoodId!);
+        return !pile || Math.hypot(pile.x - guard.x, pile.y - guard.y) < 20;
+      }),
+    `${settled.length} settled of ${guards.length} posted`,
+  );
+  check(
+    'guards are not posted on the enemy doorstep',
+    guards.every((guard) => sim.distanceToNearestNest(1, guard) > 20),
+    String(Math.min(...guards.map((g) => Math.round(sim.distanceToNearestNest(1, g))))),
+  );
+
+  // A post is held until the pile runs out, not re-picked every tick.
+  const before = new Map(guards.map((g) => [g.id, g.guardFoodId]));
+  sim.run(300);
+  const stable = [...before].filter(([id, pile]) => {
+    const unit = sim.units.get(id);
+    return unit && (unit.guardFoodId === pile || !sim.food.has(pile!));
+  }).length;
+  check('guards hold their post rather than chasing', stable >= before.size * 0.8, `${stable}/${before.size} held`);
+
+  const depleted = sim.unitsOf(0).find((u) => u.type === 'soldier' && u.guardFoodId !== null);
+  const pile = depleted ? sim.food.get(depleted.guardFoodId!) : undefined;
+  if (depleted && pile) {
+    sim.removeFood(pile, false);
+    check('a guard is released the moment its pile runs out', depleted.guardFoodId === null);
+  } else {
+    check('found a posted guard whose release can be tested', false);
+  }
+}
+
 console.log('rule hysteresis');
 {
   const flappyRule = (hold?: number) =>

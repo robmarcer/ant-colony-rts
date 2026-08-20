@@ -39,6 +39,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.0',
+    timestamp: '2026-08-20T15:01:33+07:00',
+    title: 'Soldiers can guard food',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'New soldier_posture guard_food: soldiers post on food piles and kill whatever comes to collect it, denying the source rather than fighting for territory. New preset-blockade uses it, entering the field fourth of nine at 59%.' },
+      { area: 'ai', detail: 'Guards are leashed to 12 cells of their post and do not chase. Without a leash the first version had guards following workers across the map, with 2 of 17 soldiers actually standing on the pile they were meant to be denying and several posted 11 cells from the enemy nest.', fix: true },
+      { area: 'ai', detail: 'Post selection weights enemy worker activity at the pile first, then size, then how much closer it is to them than to us, minus distance from our own nests and, at low risk_tolerance, proximity to their nest. The denial term is capped both ways, because uncapped it always picks the pile touching the enemy nest, which is not a post but a funeral.', fix: true },
+      { area: 'ai', detail: 'A post is sticky and held until the pile is exhausted. Choosing fresh every tick made guards chase whichever pile momentarily had the most enemy workers, and only 3 of 28 ended up on a pile. Stickiness was the change that made the posture work at all.', fix: true },
+      { area: 'sim', detail: 'Removing a food source now releases soldiers guarding it as well as workers gathering from it. Previously the guard field pointed at a deleted pile.', fix: true },
+      { area: 'balance', detail: 'Measured against an otherwise identical definition sitting at home, four seeds against preset-boom: opponent income fell from 14,878 to 13,710, their worker losses rose from 48 to 423, at a cost of 20 soldiers, and it took a win off preset-boom where the control took none.' },
+      { area: 'docs', detail: 'Documented in docs/behaviour.md, including the two limits: sixty-odd piles on the map means denial dents income rather than strangling it, and in a closed system killing workers deep in their half hands them the corpses, so contested ground near your own side is worth more.' },
+      { area: 'tests', detail: 'Seven checks: guarding denies food and multiplies worker kills against a control, soldiers take up posts, a guard that has had time to arrive is on its pile, none are posted on the enemy doorstep, posts are held rather than chased, and a guard is released the moment its pile runs out.' },
+    ],
+  },
+  {
     version: '0.9.0',
     timestamp: '2026-08-20T14:41:46+07:00',
     title: 'Rules can hold, and flapping is reported',
