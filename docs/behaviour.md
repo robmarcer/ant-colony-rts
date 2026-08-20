@@ -118,7 +118,8 @@ What pushing soldiers do.
 - `escort_workers` shadows the friendly worker that is furthest from the nest.
 - `harass_enemy_workers` hunts the nearest enemy worker anywhere on the map, and
   prefers a queen walking to a founding site if one is within about 90 cells.
-- `attack_enemy_nest` marches on the nearest enemy nest.
+- `attack_enemy_nest` marches on the nearest enemy nest. Expect to be there a
+  while: see Sieges below.
 - `guard_food` posts soldiers on food piles and kills whatever comes to collect
   it. See below.
 
@@ -253,6 +254,29 @@ units walks within vision range of it (12 cells for a worker, 14 for a soldier,
 12 for a queen). Idle workers pick targets from that shared memory, which is the
 intel mechanic. Scouting has real value because unexplored food is invisible to
 your foragers even though the map is otherwise open.
+
+## Sieges
+
+Killing a queen is deliberately slow. She has 2,500 health, 2 points of armour
+against every hit, and at most 6 attackers can reach her at once, whatever the
+size of the army outside. A full complement of soldiers therefore needs about 60
+seconds of unbroken assault, and the attacker has to survive at the nest for all
+of it. A swarm of workers needs nearly 7 minutes and is not a real threat.
+
+That has consequences worth planning around, all measured:
+
+- Committing an army is much riskier than it was. In the field, `example-adaptive`
+  and `preset-boom` sit above `example-mass-rush` now, and only 22% of matches end
+  in an elimination, down from 36% before sieges.
+- Piling more soldiers on does not speed it up past the slot limit. What extra
+  soldiers buy is holding the ground around the nest for the full 60 seconds, not
+  a faster kill.
+- Raising a commit threshold does not compensate. Measured across 12 matches per
+  setting, committing at 12, 20, 30 and 45 soldiers won 3, 3, 4 and 0
+  respectively. There is no threshold that makes a straightforward rush strong
+  again.
+- A colony with several nests has several queens, each needing its own siege, so
+  expansion is also a defensive investment.
 
 ## Battlefields
 

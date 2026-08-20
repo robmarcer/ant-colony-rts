@@ -204,6 +204,22 @@ round robins, or the sweep will take most of an hour rather than a minute.
 - No fog of war. Unit positions are global; food still has to be discovered by
   walking within vision range. See "Deliberate simplifications" below.
 
+## Sieges
+
+A queen has 2,500 health and 2 armour, and at most 6 attackers can reach her at
+once however large the army outside. A full complement of soldiers needs roughly
+60 seconds of unbroken assault, against 4.6 seconds before this was introduced.
+
+The attacker-slot limit is the part that does the work. Health alone cannot make
+a siege take time, because time to kill is health over damage per second, so a
+bigger army just scales the duration back down.
+
+The cost is a real nerf to aggression, which is worth being explicit about:
+eliminations fell from 36% of matches to 22%, and `example-mass-rush` went from
+84% to 50%. Raising its commit threshold does not recover it, measured at 12, 20,
+30 and 45 soldiers. If aggression should be stronger, the levers are
+`QUEEN_MAX_ATTACKERS` and the queen's health in `src/sim/config.ts`.
+
 ## Win conditions
 
 Killing every enemy queen wins outright. If both colonies still have a queen at
@@ -248,15 +264,18 @@ The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
 matches are not degenerate. Current state, measured over a round robin of the
 starter definitions across two seeds (112 matches):
 
-- 36% of matches were decided by eliminating a colony, the rest on score at the
-  time limit.
-- Win rates spread from 3% to 84% across nine definitions.
+- 22% of matches were decided by eliminating a colony, the rest on score at the
+  time limit. That figure was 36% before sieges were introduced.
+- Win rates spread from 3% to 88% across nine definitions.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
-- Every strategy above 69% expands. The two one-nest presets sit at 28% and 19%.
-- Area denial is competitive: preset-blockade, which does nothing but post
-  soldiers on food, is third at 78%.
+- Every strategy above 60% expands. The two one-nest presets sit at 28% and 16%.
+- Area denial is strong: preset-blockade, which does nothing but post soldiers on
+  food, is second at 81%.
+- Since sieges were introduced, economy and denial lead the field and committed
+  aggression is mid-table. preset-boom 88%, preset-blockade 81%,
+  example-adaptive 75%, preset-scout 63%, example-mass-rush 50%.
 - Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
   walk, so expansion is a strong play whose real cost is the 200 food and the
   minute of lost production rather than the risk of interception.
@@ -297,7 +316,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 88 properties, including:
+`npm run selftest` asserts 93 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk

@@ -64,7 +64,7 @@ export interface UnitStats {
 
 export const UNIT_STATS: Record<UnitType, UnitStats> = {
   queen: {
-    maxHp: 500,
+    maxHp: 2500,
     // A new queen walks to a founding site, slowly and vulnerably, then settles
     // and never moves again. The founder of the colony starts already settled.
     speed: 1.1,
@@ -111,6 +111,25 @@ export const UNIT_STATS: Record<UnitType, UnitStats> = {
  * cost 40 food against the soldier's 30, so quality wins the straight fight
  * while numbers stay economically viable. That tradeoff is the point.
  */
+
+/**
+ * Killing a queen is meant to be a siege, not a drive-by.
+ *
+ * Health alone cannot achieve that, because time to kill is health divided by
+ * damage per second, so a bigger attacking army simply scales the duration back
+ * down. A twelve soldier ball against the old 500 health queen killed her in
+ * under five seconds.
+ *
+ * So the number of attackers that can reach a queen at once is capped: think of
+ * it as how many ants fit in the nest entrance. That puts a floor on how long an
+ * assault must be sustained, whatever the size of the army outside, and the
+ * attacker has to survive at the nest for all of it.
+ *
+ * Armour is a flat reduction per hit, which mainly matters for workers: it takes
+ * a real army to hurt a queen rather than a swarm of labourers.
+ */
+export const QUEEN_MAX_ATTACKERS = 6;
+export const QUEEN_ARMOUR = 2;
 
 /** Radius around a nest that counts as "at home" for deposits and regen. */
 export const NEST_RADIUS = 4;

@@ -11,6 +11,8 @@ import {
   MAX_NESTS_PER_COLONY,
   NEST_RADIUS,
   NEST_REGEN_PER_SECOND,
+  QUEEN_ARMOUR,
+  QUEEN_MAX_ATTACKERS,
   SCORE_WEIGHTS,
   STALEMATE_UNIT_TOLERANCE,
   STALEMATE_WINDOW_SECONDS,
@@ -646,6 +648,11 @@ export class Simulation {
   private resolveCombat(): void {
     const dead: Array<{ unit: Unit; killer: ColonyId }> = [];
 
+    // Only so many attackers fit around a queen at once. Decided before any
+    // damage is applied, in unit id order, so the same units get the slots every
+    // tick and the result does not depend on map iteration order.
+    const queenSlots = this.assignQueenAttackSlots();
+
     for (const unit of this.units.values()) {
       if (unit.targetEnemyId === null) continue;
       const target = this.units.get(unit.targetEnemyId);
@@ -656,9 +663,12 @@ export class Simulation {
       const stats = UNIT_STATS[unit.type];
       if (Math.hypot(target.x - unit.x, target.y - unit.y) > stats.attackRange) continue;
       if (unit.attackCooldown > 0) continue;
+      // Standing in the queue counts as being in the fight, but only the units
+      // holding a slot land blows.
+      if (target.type === 'queen' && !queenSlots.get(target.id)?.has(unit.id)) continue;
 
       unit.attackCooldown = stats.attackCooldown;
-      target.hp -= stats.attack;
+      target.hp -= target.type === 'queen' ? Math.max(1, stats.attack - QUEEN_ARMOUR) : stats.attack;
       target.lastDamagedTick = this.tick;
       if (!this.firstContactSeen) {
         this.firstContactSeen = true;
@@ -671,6 +681,29 @@ export class Simulation {
       if (!this.units.has(unit.id)) continue; // already removed this tick
       this.killUnit(unit, killer);
     }
+  }
+
+  /**
+   * For each queen under attack, which enemies currently hold one of the limited
+   * positions around her. Nearest first, then by id, so the slots are stable
+   * while the same units stay in contact.
+   */
+  private assignQueenAttackSlots(): Map<number, Set<number>> {
+    const slots = new Map<number, Set<number>>();
+    for (const id of [0, 1] as ColonyId[]) {
+      for (const queen of this.queensOf(id)) {
+        const contenders: Array<{ id: number; distance: number }> = [];
+        for (const enemy of this.near(id === 0 ? 1 : 0, queen, 4)) {
+          const range = UNIT_STATS[enemy.type].attackRange;
+          const distance = Math.hypot(enemy.x - queen.x, enemy.y - queen.y);
+          if (distance <= range) contenders.push({ id: enemy.id, distance });
+        }
+        if (contenders.length === 0) continue;
+        contenders.sort((a, b) => a.distance - b.distance || a.id - b.id);
+        slots.set(queen.id, new Set(contenders.slice(0, QUEEN_MAX_ATTACKERS).map((c) => c.id)));
+      }
+    }
+    return slots;
   }
 
   private killUnit(unit: Unit, killer: ColonyId): void {

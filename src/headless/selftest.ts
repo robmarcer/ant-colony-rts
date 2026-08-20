@@ -12,6 +12,8 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   MIN_NEST_SEPARATION,
+  QUEEN_ARMOUR,
+  QUEEN_MAX_ATTACKERS,
   UNITS_PER_NEST,
   UNIT_STATS,
 } from '../sim/config.js';
@@ -224,7 +226,16 @@ console.log('corpses');
     timeLimitSeconds: 900,
     definitions: [def('a', 'rush'), def('b', 'boom')],
   });
-  fought.run(9001);
+  // Sampled during the match, not at the end: piles get harvested, so the
+  // largest one still standing at the final tick says nothing about whether
+  // fighting concentrated food while it was happening.
+  let peakPile = 0;
+  for (let i = 0; i < 90 && !fought.finished; i++) {
+    fought.run(100);
+    for (const source of fought.food.values()) {
+      if (source.kind === 'corpse') peakPile = Math.max(peakPile, source.amount);
+    }
+  }
   const corpses = [...fought.food.values()].filter((f) => f.kind === 'corpse');
   const deaths = fought.colonies.reduce((n, c) => n + c.unitsLost.worker + c.unitsLost.soldier, 0);
   check('a match with combat leaves corpse piles', corpses.length > 0, `${corpses.length} piles from ${deaths} deaths`);
@@ -235,8 +246,8 @@ console.log('corpses');
   );
   check(
     'fighting concentrates food into a pile worth a trip',
-    Math.max(...corpses.map((c) => c.amount)) > UNIT_STATS.worker.carryCapacity,
-    String(Math.round(Math.max(...corpses.map((c) => c.amount)))),
+    peakPile > UNIT_STATS.worker.carryCapacity * 2,
+    `peak pile ${Math.round(peakPile)} against a carry capacity of ${UNIT_STATS.worker.carryCapacity}`,
   );
 }
 
@@ -300,6 +311,41 @@ console.log('closed system');
       `drift ${(mid.totalEnergy() - before).toFixed(6)}`,
     );
   }
+}
+
+console.log('killing a queen is a siege');
+{
+  const sim = new Simulation({ seed: 'siege', timeLimitSeconds: 900, definitions: [def('a', 'boom'), def('b', 'boom')] });
+  const queen = sim.queensOf(1)[0];
+
+  // Twenty soldiers piled onto one queen. Only the slots should land blows.
+  for (let i = 0; i < 20; i++) {
+    const attacker = sim.spawnUnit('soldier', 0, { x: queen.x + 0.4, y: queen.y + 0.4 });
+    attacker.targetEnemyId = queen.id;
+  }
+  const before = queen.hp;
+  sim.run(10);
+  const dealt = before - queen.hp;
+  const perSlot = UNIT_STATS.soldier.attack - QUEEN_ARMOUR;
+  const capped = QUEEN_MAX_ATTACKERS * perSlot;
+
+  check('armour reduces what a soldier lands on a queen', perSlot < UNIT_STATS.soldier.attack);
+  check(
+    'only the attacker slots land damage, however many pile in',
+    dealt > 0 && dealt <= capped * 1.5,
+    `${dealt} in one second from 20 soldiers, cap implies about ${capped}`,
+  );
+  check(
+    'twenty soldiers do far less than twenty soldiers worth',
+    dealt < 20 * perSlot * 0.6,
+    `${dealt} vs ${20 * perSlot} if uncapped`,
+  );
+
+  const secondsToKill = UNIT_STATS.queen.maxHp / capped;
+  check('a full complement needs a sustained assault to kill a queen', secondsToKill > 30, `${secondsToKill.toFixed(0)}s`);
+
+  const workerSeconds = UNIT_STATS.queen.maxHp / (QUEEN_MAX_ATTACKERS * Math.max(1, UNIT_STATS.worker.attack - QUEEN_ARMOUR));
+  check('a swarm of workers cannot realistically kill a queen', workerSeconds > 300, `${workerSeconds.toFixed(0)}s`);
 }
 
 console.log('guarding food');
@@ -485,10 +531,13 @@ console.log('stalemate detection');
     },
     'massing',
   ).definition;
+  // Opponent chosen by measurement, not assumption: since sieges were
+  // introduced, a massing attack no longer reliably breaks preset-boom, so a
+  // boom control would be testing the wrong thing again.
   const decisive = new Simulation({
     seed: '1',
     timeLimitSeconds: 90000,
-    definitions: [massing, def('b', 'boom')],
+    definitions: [massing, def('b', 'harass')],
   });
   decisive.run(900001);
   check(

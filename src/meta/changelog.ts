@@ -39,6 +39,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.12.0',
+    timestamp: '2026-08-20T15:32:32+07:00',
+    title: 'Killing a queen is a siege',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'Queen health raised from 500 to 2,500, plus 2 points of armour against every hit, and at most 6 attackers can reach a queen at once whatever the size of the army outside. A full complement of soldiers now needs about 60 seconds of unbroken assault, against 4.6 seconds for a twelve soldier ball before.' },
+      { area: 'sim', detail: 'The attacker slot limit is the part that does the work. Health alone cannot make a siege take time, because time to kill is health over damage per second, so a bigger army simply scales the duration back down. Slots put a floor on the duration instead, and the attacker has to hold the ground for all of it.' },
+      { area: 'sim', detail: 'Slots are assigned nearest first then by unit id, before any damage is applied, so they are stable while the same units stay in contact and do not depend on map iteration order.' },
+      { area: 'balance', detail: 'Armour makes a labour swarm useless against a queen: a worker lands 1 instead of 3, so six workers would need nearly 7 minutes.' },
+      { area: 'balance', detail: 'This is a real nerf to aggression and the numbers say so. Eliminations fell from 36% of matches to 22%, and example-mass-rush from 84% to 50% with its score margin going negative. Raising the commit threshold does not recover it: measured over 12 matches per setting, committing at 12, 20, 30 and 45 soldiers won 3, 3, 4 and 0. Economy and denial now lead the field, with preset-boom at 88% and preset-blockade at 81%.' },
+      { area: 'balance', detail: 'One emergent upside: because sieges concentrate a minute of fighting in one place, battlefield corpse piles are far larger than before, reaching 800 to 1,400 food in decisive matches, which makes holding the ground after a siege genuinely valuable.' },
+      { area: 'tests', detail: 'Five checks, including piling twenty soldiers onto one queen and asserting the damage lands at the slot rate rather than the pile rate. Two existing tests had premises invalidated by this change and were corrected: the decisive-match control no longer used an opponent a massing attack can actually break, and the corpse concentration test measured the largest pile surviving to the final tick rather than the peak during the match.' },
+    ],
+  },
+  {
     version: '0.11.0',
     timestamp: '2026-08-20T15:21:19+07:00',
     title: 'Population ceiling raised to 100 per nest',
