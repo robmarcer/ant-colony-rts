@@ -1,10 +1,28 @@
 # Changelog
 
-Current version: **0.14.0**. 14 releases, 100 recorded changes.
+Current version: **0.15.0**. 15 releases, 105 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.15.0 — The changelog and the LLM brief are their own pages
+
+2026-08-20 17:08 (UTC+07:00) · committed · 5 changes
+
+**Viewer**
+
+- The changelog is now a standalone page at /changelog.html, opened in its own tab from the header, so reading it no longer covers a running match. Verified the match keeps ticking in the original tab while the changelog is open in another.
+- New /instructions.html renders the agent brief with a one-click copy, for pasting into a model. It fetches GET /api/brief rather than bundling a copy, so what you paste is exactly what the API serves.
+- Removed the in-app changelog overlay. Rendering moved to src/ui/changelog-view.ts, still reading src/meta/changelog.ts, so there is one implementation rather than two to keep correct.
+
+**Docs**
+
+- AGENTS.md records the convention that a change gets a GitHub issue before it is started, and the commit references it, so conversational requests still end up tracked.
+
+**Tooling**
+
+- Vite builds three entry points instead of one.
 
 ## 0.14.0 — Documented for an LLM to drive
 

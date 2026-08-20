@@ -17,6 +17,10 @@ it silently.
 
 ## Changing the codebase
 
+- Raise a GitHub issue before starting a change, and reference it in the commit
+  (`Closes #12`). All development on this project is tracked through issues, so
+  work that arrives as a conversational request still gets an issue first.
+
 - `npm run selftest` must pass before anything is committed. It is not a unit test
   suite, it is a set of assertions that the simulation is deterministic and not
   obviously broken. If a check fails, work out whether the code or the assertion

@@ -118,6 +118,32 @@ canvas {
 .log li.c0 .t { color: var(--a); }
 .log li.c1 .t { color: var(--b); }
 
+.page { padding-bottom: 40px; }
+.reading {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 20px 40px;
+}
+.reading h1 { font-size: 20px; margin: 12px 0 4px; }
+.reading pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.reading code {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
 .version {
   color: var(--muted);
   text-decoration: none;

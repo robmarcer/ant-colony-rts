@@ -10,7 +10,7 @@ import type { BehaviourDefinition } from '../sim/definition.js';
 import type { ColonyId, MatchEvent } from '../sim/types.js';
 import type { StrategyConfig } from '../sim/strategy.js';
 import { Renderer } from './renderer.js';
-import { APP_VERSION, CHANGELOG, totalChanges, type ChangeArea } from '../meta/changelog.js';
+import { APP_VERSION } from '../meta/changelog.js';
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -30,7 +30,6 @@ const showIntel = el<HTMLInputElement>('showIntel');
 const playPause = el<HTMLButtonElement>('playPause');
 const eventLog = el<HTMLOListElement>('eventLog');
 const summary = el<HTMLDivElement>('summary');
-const changelog = el<HTMLDivElement>('changelog');
 
 let sim: Simulation | null = null;
 let playing = false;
@@ -315,78 +314,6 @@ function scoreFormula(): string {
   );
 }
 
-// --------------------------------------------------------------- changelog view
-
-const AREA_LABELS: Record<ChangeArea, string> = {
-  sim: 'sim',
-  ai: 'unit ai',
-  balance: 'balance',
-  perf: 'perf',
-  api: 'api',
-  ui: 'viewer',
-  tests: 'tests',
-  docs: 'docs',
-  tooling: 'tooling',
-};
-
-/**
- * Rendered in the timestamp's own offset, not the reader's, so an entry always
- * shows the moment it was recorded.
- */
-function formatWhen(iso: string): string {
-  const offset = iso.slice(-6);
-  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
-  const minutes = match ? (match[1] === '-' ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3])) : 0;
-  const shifted = new Date(new Date(iso).getTime() + minutes * 60_000);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return (
-    `${days[shifted.getUTCDay()]} ${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}` +
-    ` ${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())} (UTC${offset})`
-  );
-}
-
-function renderChangelog(): void {
-  const entries = CHANGELOG.map((entry) => {
-    const provenance = entry.commit
-      ? `commit ${escape(entry.commit)}`
-      : entry.precision === 'commit'
-        ? 'committed'
-        : 'reconstructed, no commit';
-    const items = entry.changes
-      .map(
-        (change) =>
-          `<li><span class="tag ${change.fix ? 'fix' : ''}">${escape(change.fix ? 'fix' : AREA_LABELS[change.area])}</span>` +
-          `<span class="text">${escape(change.detail)}</span></li>`,
-      )
-      .join('');
-    return `
-      <div class="entry">
-        <h3>${escape(entry.version)} — ${escape(entry.title)}</h3>
-        <p class="when">${escape(formatWhen(entry.timestamp))} · ${provenance} · ${entry.changes.length} changes</p>
-        <ul>${items}</ul>
-      </div>`;
-  }).join('');
-
-  changelog.innerHTML = `
-    <div class="card">
-      <h2>Changelog</h2>
-      <p class="provenance">
-        Version ${escape(APP_VERSION)} · ${CHANGELOG.length} releases · ${totalChanges()} recorded changes.
-        Entries marked "reconstructed" predate version control on this project: their times come from file
-        modification times and saved match records, so they are accurate to the hour and have no commits behind
-        them. Later entries carry a git commit.
-      </p>
-      ${entries}
-      <p><button id="closeChangelog">Close</button></p>
-    </div>`;
-  changelog.classList.remove('hidden');
-  el<HTMLButtonElement>('closeChangelog').onclick = () => {
-    changelog.classList.add('hidden');
-    if (location.hash === '#changelog') history.replaceState(null, '', location.pathname);
-  };
-}
-
 function escape(input: string): string {
   return input.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
@@ -394,15 +321,6 @@ function escape(input: string): string {
 // --------------------------------------------------------------------- wiring
 
 el<HTMLSpanElement>('versionNumber').textContent = `v${APP_VERSION}`;
-
-el<HTMLAnchorElement>('versionLink').onclick = (event) => {
-  event.preventDefault();
-  history.replaceState(null, '', '#changelog');
-  renderChangelog();
-};
-
-// Deep link, so the changelog can be shared or bookmarked.
-if (location.hash === '#changelog') renderChangelog();
 
 el<HTMLButtonElement>('newMatch').onclick = () =>
   void startMatch(defASelect.value, defBSelect.value, seedInput.value || '1', Number(limitInput.value) || 600);

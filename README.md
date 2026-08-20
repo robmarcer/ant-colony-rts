@@ -22,6 +22,9 @@ npm run dev
 ```
 
 `npm run dev` starts the API on 8787 and the viewer on http://localhost:5273.
+Three pages: the match at `/`, the changelog at `/changelog.html`, and the brief
+to paste into a model at `/instructions.html`. The header links to the latter two
+open in their own tab, so reading them never disturbs a running match.
 
 Headless matches need neither:
 
@@ -60,6 +63,11 @@ and carries a git hash, which is the point of putting the project under version
 control.
 
 ## Pointing an LLM at it
+
+Easiest route: open `/instructions.html`, press "Copy the brief", paste it into the
+model, and tell it the API is at `http://localhost:8787`. That page renders the
+live response from `GET /api/brief`, so what you paste cannot be out of step with
+the simulation.
 
 `docs/agent-brief.md` is written for a model rather than a human reader: the loop,
 the eight knobs, the rule format, the traps that have each cost a real strategy

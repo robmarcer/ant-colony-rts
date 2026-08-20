@@ -39,6 +39,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.15.0',
+    timestamp: '2026-08-20T17:08:48+07:00',
+    title: 'The changelog and the LLM brief are their own pages',
+    precision: 'commit',
+    changes: [
+      { area: 'ui', detail: 'The changelog is now a standalone page at /changelog.html, opened in its own tab from the header, so reading it no longer covers a running match. Verified the match keeps ticking in the original tab while the changelog is open in another.' },
+      { area: 'ui', detail: 'New /instructions.html renders the agent brief with a one-click copy, for pasting into a model. It fetches GET /api/brief rather than bundling a copy, so what you paste is exactly what the API serves.' },
+      { area: 'ui', detail: 'Removed the in-app changelog overlay. Rendering moved to src/ui/changelog-view.ts, still reading src/meta/changelog.ts, so there is one implementation rather than two to keep correct.' },
+      { area: 'tooling', detail: 'Vite builds three entry points instead of one.' },
+      { area: 'docs', detail: 'AGENTS.md records the convention that a change gets a GitHub issue before it is started, and the commit references it, so conversational requests still end up tracked.' },
+    ],
+  },
+  {
     version: '0.14.0',
     timestamp: '2026-08-20T15:47:27+07:00',
     title: 'Documented for an LLM to drive',
