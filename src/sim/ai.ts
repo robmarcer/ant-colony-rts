@@ -263,8 +263,13 @@ function chooseFoundingSite(sim: Simulation, colony: Colony, parent: Nest): Vec 
     if (!farEnoughFromOwn(site) || !farEnoughFromEnemy(site)) continue;
 
     const fromParent = Math.hypot(site.x - parent.x, site.y - parent.y);
-    const danger = Math.max(0, 60 - enemyDistance(site)) / 60;
-    const score = 0.05 * known.estAmount - 0.5 * fromParent - danger * 60 * (1 - strategy.risk_tolerance);
+    const dEnemy = enemyDistance(site);
+    const danger = Math.max(0, 60 - dEnemy) / 60;
+    let score = 0.05 * known.estAmount - 0.5 * fromParent - danger * 60 * (1 - strategy.risk_tolerance);
+
+    // Which way to lean between otherwise comparable sites.
+    if (strategy.expansion_bias === 'toward_enemy') score -= 0.35 * dEnemy;
+    else if (strategy.expansion_bias === 'toward_safety') score += 0.35 * dEnemy;
     if (score > bestScore) {
       bestScore = score;
       best = site;

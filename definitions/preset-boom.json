@@ -15,8 +15,9 @@
     "soldier_posture": "defend_nest",
     "risk_tolerance": 0.2,
     "target_nests": 4,
-    "recycle_surplus": 0.5
+    "recycle_surplus": 0.5,
+    "expansion_bias": "toward_food"
   },
   "rules": [],
-  "updatedAt": "2026-08-20T08:35:47.791Z"
+  "updatedAt": "2026-08-20T10:58:48.635Z"
 }

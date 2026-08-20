@@ -1,10 +1,31 @@
 # Changelog
 
-Current version: **0.18.0**. 18 releases, 127 recorded changes.
+Current version: **0.19.0**. 19 releases, 132 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.19.0 — Richer rule conditions, an expansion bias, and a layout fix
+
+2026-08-20 18:01 (UTC+07:00) · committed · 5 changes
+
+**Simulation**
+
+- Rule clauses take three forms now: a metric against a constant, a metric against another metric, or an any_of group where one comparison holding is enough. Previously only the first existed, so "I have fewer soldiers than they do" could not be expressed at all and an author had to guess an absolute threshold instead of stating the relationship.
+- New ninth knob expansion_bias: toward_food, toward_enemy or toward_safety, deciding which way a new queen leans between candidate sites. Measured on one seed at four nests, mean distance from a new nest to the nearest enemy nest was 121, 143 and 160 cells. toward_food is the previous behaviour, so omitting the knob changes nothing.
+
+**Balance**
+
+- preset-harass and preset-blockade ship with toward_enemy, since both depend on reaching contested ground, and preset-turtle with toward_safety.
+
+**Viewer**
+
+- Fix: A bare main selector written for the match viewer was inherited by the changelog and instructions pages, so their content sat in the first track of a two column grid while the 380px sidebar track stayed empty. A 9,570 character brief was read through a 451px porthole on a 1,265px page, with a second scrollbar inside a page that barely scrolled. The grid is now scoped to the match page and the reading pages are one column: the brief measures 713px wide on a 753px page with no inner scrollbar.
+
+**Tests**
+
+- Sixteen checks: metric-versus-metric parses and evaluates both ways, any_of fires on one member and not on none, groups AND with plain clauses, and four malformed forms are rejected by path. Plus the bias measurably moves nests in both directions and an unknown value falls back to the previous behaviour.
 
 ## 0.18.0 — A ladder with ratings and intervals
 

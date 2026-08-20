@@ -1,5 +1,6 @@
 import { NEST_RADIUS, UNIT_STATS } from './config.js';
-import type { BehaviourDefinition, RuleCondition, RuleMetric } from './definition.js';
+import { isAnyOf } from './definition.js';
+import type { BehaviourDefinition, RuleClause, RuleCondition, RuleMetric } from './definition.js';
 import type { StrategyConfig } from './strategy.js';
 import type { ColonyId } from './types.js';
 import type { Simulation } from './sim.js';
@@ -65,18 +66,25 @@ export function computeMetrics(sim: Simulation, colonyId: ColonyId): Metrics {
 
 function conditionHolds(condition: RuleCondition, metrics: Metrics): boolean {
   const actual = metrics[condition.metric];
+  // Against another metric when given one, otherwise against the constant.
+  const target = condition.metric2 !== undefined ? metrics[condition.metric2] : (condition.value ?? 0);
   switch (condition.op) {
     case 'gt':
-      return actual > condition.value;
+      return actual > target;
     case 'gte':
-      return actual >= condition.value;
+      return actual >= target;
     case 'lt':
-      return actual < condition.value;
+      return actual < target;
     case 'lte':
-      return actual <= condition.value;
+      return actual <= target;
     case 'eq':
-      return actual === condition.value;
+      return actual === target;
   }
+}
+
+function clauseHolds(clause: RuleClause, metrics: Metrics): boolean {
+  if (isAnyOf(clause)) return clause.any_of.some((condition) => conditionHolds(condition, metrics));
+  return conditionHolds(clause, metrics);
 }
 
 export interface RuleEvaluation {
@@ -103,7 +111,7 @@ export function evaluateRules(
 
   definition.rules.forEach((rule, index) => {
     const id = rule.id ?? `rule_${index}`;
-    const matches = rule.when.every((condition) => conditionHolds(condition, metrics));
+    const matches = rule.when.every((clause) => clauseHolds(clause, metrics));
     if (!matches && !held.has(id)) return;
     activeRuleIds.push(id);
     strategy = { ...strategy, ...rule.set };

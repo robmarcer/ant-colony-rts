@@ -15,8 +15,9 @@
     "soldier_posture": "guard_food",
     "risk_tolerance": 0.5,
     "target_nests": 2,
-    "recycle_surplus": 0.5
+    "recycle_surplus": 0.5,
+    "expansion_bias": "toward_enemy"
   },
   "rules": [],
-  "updatedAt": "2026-08-20T08:35:47.792Z"
+  "updatedAt": "2026-08-20T10:58:48.636Z"
 }

@@ -87,7 +87,13 @@ hold is applied on top of `base` in list order, and later rules override earlier
 ones. It is not first-match-wins. So put broad phase rules near the top and
 emergency overrides at the bottom, where they can override the pushes above.
 
-Conditions within a rule are ANDed. There is no OR: write two rules.
+Clauses in `when` are ANDed. A clause takes three forms:
+
+- `{"metric": "my_soldiers", "op": "gte", "value": 20}` against a constant.
+- `{"metric": "my_soldiers", "op": "lt", "metric2": "enemy_soldiers"}` against
+  another metric, which is how you say "fewer soldiers than they have" without
+  guessing an absolute number.
+- `{"any_of": [ ... ]}` where one of its comparisons holding is enough.
 
 `min_hold_seconds` keeps a rule active for at least that long once it fires. Use
 it on any rule whose threshold the match will cross repeatedly, or the colony
@@ -96,7 +102,7 @@ will switch behaviour on and off and achieve nothing.
 Anything the parser rejects comes back in `issues` with an exact path. Read it.
 A rule naming a metric that does not exist is silently dropped from the match.
 
-## The eight knobs, in order of how much they decide
+## The nine knobs, in order of how much they decide
 
 1. `target_nests` (1-6). The strongest lever. Each nest is an independent build
    slot drawing on the shared food stockpile, plus 100 more units of population,
@@ -117,6 +123,11 @@ A rule naming a metric that does not exist is silently dropped from the match.
    many. Also the floor recycling will not cull below.
 8. `recycle_surplus` (0-1). Send surplus units home to be eaten by a queen,
    returning their full cost. Only works at 90%+ of your population ceiling.
+9. `expansion_bias`. Which way a new queen leans when choosing between sites:
+   `toward_food`, `toward_enemy` or `toward_safety`. Measured over a match,
+   mean distance from a new nest to the nearest enemy nest was 121, 143 and 160
+   cells respectively. Forward nests extend how far `contest_enemy_food` and
+   `guard_food` reach, at the cost of a queen closer to their army.
 
 ## Rule metrics
 

@@ -39,6 +39,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.19.0',
+    timestamp: '2026-08-20T18:01:12+07:00',
+    title: 'Richer rule conditions, an expansion bias, and a layout fix',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'Rule clauses take three forms now: a metric against a constant, a metric against another metric, or an any_of group where one comparison holding is enough. Previously only the first existed, so "I have fewer soldiers than they do" could not be expressed at all and an author had to guess an absolute threshold instead of stating the relationship.' },
+      { area: 'sim', detail: 'New ninth knob expansion_bias: toward_food, toward_enemy or toward_safety, deciding which way a new queen leans between candidate sites. Measured on one seed at four nests, mean distance from a new nest to the nearest enemy nest was 121, 143 and 160 cells. toward_food is the previous behaviour, so omitting the knob changes nothing.' },
+      { area: 'ui', detail: 'A bare main selector written for the match viewer was inherited by the changelog and instructions pages, so their content sat in the first track of a two column grid while the 380px sidebar track stayed empty. A 9,570 character brief was read through a 451px porthole on a 1,265px page, with a second scrollbar inside a page that barely scrolled. The grid is now scoped to the match page and the reading pages are one column: the brief measures 713px wide on a 753px page with no inner scrollbar.', fix: true },
+      { area: 'balance', detail: 'preset-harass and preset-blockade ship with toward_enemy, since both depend on reaching contested ground, and preset-turtle with toward_safety.' },
+      { area: 'tests', detail: 'Sixteen checks: metric-versus-metric parses and evaluates both ways, any_of fires on one member and not on none, groups AND with plain clauses, and four malformed forms are rejected by path. Plus the bias measurably moves nests in both directions and an unknown value falls back to the previous behaviour.' },
+    ],
+  },
+  {
     version: '0.18.0',
     timestamp: '2026-08-20T17:55:01+07:00',
     title: 'A ladder with ratings and intervals',

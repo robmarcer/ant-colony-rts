@@ -14,6 +14,8 @@ export const EXPANSION_PRIORITIES = [
   'contest_enemy_food',
 ] as const;
 
+export const EXPANSION_BIASES = ['toward_food', 'toward_enemy', 'toward_safety'] as const;
+
 export const SOLDIER_POSTURES = [
   'defend_nest',
   'escort_workers',
@@ -23,6 +25,7 @@ export const SOLDIER_POSTURES = [
 ] as const;
 
 export type ExpansionPriority = (typeof EXPANSION_PRIORITIES)[number];
+export type ExpansionBias = (typeof EXPANSION_BIASES)[number];
 export type SoldierPosture = (typeof SOLDIER_POSTURES)[number];
 
 export interface StrategyConfig {
@@ -51,6 +54,12 @@ export interface StrategyConfig {
    * Only applies under population pressure: see RECYCLE_PRESSURE_FRACTION.
    */
   recycle_surplus: number;
+  /**
+   * Where a new queen prefers to settle. target_nests says how many nests you
+   * want; this says which way to lean when choosing between candidate sites.
+   * toward_food is the existing behaviour.
+   */
+  expansion_bias: ExpansionBias;
 }
 
 export const DEFAULT_STRATEGY: StrategyConfig = {
@@ -62,6 +71,7 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   risk_tolerance: 0.4,
   target_nests: 2,
   recycle_surplus: 0,
+  expansion_bias: 'toward_food',
 };
 
 /** Hand written strategies, used for LLM-free matches and as a baseline. */
@@ -76,6 +86,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.2,
     target_nests: 4,
     recycle_surplus: 0.5,
+    expansion_bias: 'toward_food',
   },
   rush: {
     unit_production_ratio: { worker: 0.35, soldier: 0.65 },
@@ -86,6 +97,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.9,
     target_nests: 1,
     recycle_surplus: 0,
+    expansion_bias: 'toward_food',
   },
   harass: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -98,6 +110,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.6,
     target_nests: 2,
     recycle_surplus: 0,
+    expansion_bias: 'toward_enemy',
   },
   turtle: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -108,6 +121,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.15,
     target_nests: 1,
     recycle_surplus: 0,
+    expansion_bias: 'toward_safety',
   },
   blockade: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -118,6 +132,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.5,
     target_nests: 2,
     recycle_surplus: 0.5,
+    expansion_bias: 'toward_enemy',
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -128,6 +143,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     risk_tolerance: 0.5,
     target_nests: 3,
     recycle_surplus: 0,
+    expansion_bias: 'toward_food',
   },
 };
 
@@ -166,6 +182,14 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
     expansion = fallback.expansion_priority;
   }
 
+  let bias = input.expansion_bias as ExpansionBias;
+  if (!EXPANSION_BIASES.includes(bias)) {
+    if (input.expansion_bias !== undefined) {
+      warnings.push(`expansion_bias "${String(input.expansion_bias)}" unknown, kept previous value`);
+    }
+    bias = fallback.expansion_bias;
+  }
+
   let posture = input.soldier_posture as SoldierPosture;
   if (!SOLDIER_POSTURES.includes(posture)) {
     warnings.push(`soldier_posture "${String(input.soldier_posture)}" unknown, kept previous value`);
@@ -196,6 +220,7 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
         numberOr(input.target_nests, 'target_nests', 1, MAX_NESTS_PER_COLONY, fallback.target_nests),
       ),
       recycle_surplus: numberOr(input.recycle_surplus, 'recycle_surplus', 0, 1, fallback.recycle_surplus),
+      expansion_bias: bias,
     },
     warnings,
   };
@@ -246,6 +271,12 @@ export const STRATEGY_JSON_SCHEMA = {
       description:
         'Willingness to take a bad fight. Low values retreat to the nest at high health and only engage when locally stronger. High values fight to the death.',
     },
+    expansion_bias: {
+      type: 'string',
+      enum: [...EXPANSION_BIASES],
+      description:
+        'Which way a new queen leans when choosing a site. toward_food takes the richest reachable cluster, the default and previous behaviour. toward_enemy settles forward, which extends how far contest_enemy_food and guard_food can reach but puts the nest and its queen closer to their army. toward_safety keeps nests behind your existing ones, slower to pay off and harder to kill.',
+    },
     recycle_surplus: {
       type: 'number',
       minimum: 0,
@@ -270,5 +301,6 @@ export const STRATEGY_JSON_SCHEMA = {
     'risk_tolerance',
     'target_nests',
     'recycle_surplus',
+    'expansion_bias',
   ],
 } as const;

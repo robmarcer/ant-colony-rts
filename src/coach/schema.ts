@@ -40,11 +40,21 @@ export const RevisionSchema = z.object({
       id: z.string(),
       note: z.string(),
       when: z.array(
-        z.object({
-          metric: z.enum(RULE_METRICS),
-          op: z.enum(RULE_OPS),
-          value: z.number(),
-        }),
+        z.union([
+          // Compare a metric against a constant.
+          z.object({ metric: z.enum(RULE_METRICS), op: z.enum(RULE_OPS), value: z.number() }),
+          // Or against another metric, for "fewer soldiers than they have".
+          z.object({ metric: z.enum(RULE_METRICS), op: z.enum(RULE_OPS), metric2: z.enum(RULE_METRICS) }),
+          // Or a group where one holding is enough.
+          z.object({
+            any_of: z.array(
+              z.union([
+                z.object({ metric: z.enum(RULE_METRICS), op: z.enum(RULE_OPS), value: z.number() }),
+                z.object({ metric: z.enum(RULE_METRICS), op: z.enum(RULE_OPS), metric2: z.enum(RULE_METRICS) }),
+              ]),
+            ),
+          }),
+        ]),
       ),
       set: PartialKnobsSchema,
     }),

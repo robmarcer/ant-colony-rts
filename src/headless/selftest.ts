@@ -26,6 +26,7 @@ import {
   UNIT_STATS,
 } from '../sim/config.js';
 import { RULE_METRICS, RULE_OPS, parseDefinition as parse } from '../sim/definition.js';
+import { evaluateRules } from '../sim/rules.js';
 import { APP_VERSION, CHANGELOG, totalChanges } from '../meta/changelog.js';
 
 let failures = 0;
@@ -754,6 +755,97 @@ console.log('replay is version pinned');
   }
   check('replaying a record from before version stamping is refused', refusedUnstamped);
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
+}
+
+console.log('expansion bias');
+{
+  const withBias = (bias: string) =>
+    parse(
+      { id: 'b', name: 'b', base: { ...PRESETS.boom, target_nests: 4, expansion_bias: bias }, rules: [] },
+      'b',
+    ).definition;
+
+  const meanDistanceToEnemy = (bias: string) => {
+    const sim = new Simulation({
+      seed: '1',
+      timeLimitSeconds: 900,
+      definitions: [withBias(bias), def('o', 'turtle')],
+    });
+    sim.run(9001);
+    const nests = sim.colonies[0].nests;
+    return nests.reduce((sum, nest) => sum + sim.distanceToNearestNest(1, nest), 0) / nests.length;
+  };
+
+  const forward = meanDistanceToEnemy('toward_enemy');
+  const neutral = meanDistanceToEnemy('toward_food');
+  const back = meanDistanceToEnemy('toward_safety');
+  check('toward_enemy settles closer to the enemy than the default', forward < neutral, `${forward.toFixed(0)} vs ${neutral.toFixed(0)}`);
+  check('toward_safety settles further away than the default', back > neutral, `${back.toFixed(0)} vs ${neutral.toFixed(0)}`);
+
+  const parsedBad = parse(
+    { id: 'x', name: 'x', base: { ...PRESETS.boom, expansion_bias: 'toward_the_sun' }, rules: [] },
+    'x',
+  );
+  check('an unknown bias falls back and is reported', parsedBad.definition.base.expansion_bias === 'toward_food' && parsedBad.issues.length > 0);
+
+  // Omitting the knob must reproduce the old behaviour exactly.
+  const omitted = parse({ id: 'y', name: 'y', base: { ...PRESETS.boom, expansion_bias: undefined }, rules: [] }, 'y');
+  check('omitting the knob keeps the previous behaviour', omitted.definition.base.expansion_bias === 'toward_food');
+}
+
+console.log('rule conditions');
+{
+  const metrics = { my_soldiers: 5, enemy_soldiers: 9, my_workers: 30, sim_seconds: 100 } as never;
+
+  const build = (when: unknown[]) =>
+    parse(
+      { id: 'c', name: 'c', base: PRESETS.balanced, rules: [{ id: 'r', when, set: { aggression: 0.9 } }] },
+      'c',
+    );
+
+  // Comparing two metrics: previously impossible, an author had to guess an
+  // absolute threshold instead of stating the relationship they meant.
+  const versus = build([{ metric: 'my_soldiers', op: 'lt', metric2: 'enemy_soldiers' }]);
+  check('a metric-versus-metric condition parses', versus.definition.rules.length === 1, JSON.stringify(versus.issues));
+  check(
+    'and evaluates against the other metric',
+    evaluateRules(versus.definition, metrics).activeRuleIds.length === 1,
+  );
+  const versusFalse = build([{ metric: 'my_soldiers', op: 'gt', metric2: 'enemy_soldiers' }]);
+  check('and is false when it should be', evaluateRules(versusFalse.definition, metrics).activeRuleIds.length === 0);
+
+  // any_of: one holding is enough.
+  const group = build([
+    { any_of: [{ metric: 'my_workers', op: 'gte', value: 999 }, { metric: 'my_soldiers', op: 'gte', value: 3 }] },
+  ]);
+  check('an any_of group parses', group.definition.rules.length === 1, JSON.stringify(group.issues));
+  check('one member holding is enough', evaluateRules(group.definition, metrics).activeRuleIds.length === 1);
+  const noneHold = build([
+    { any_of: [{ metric: 'my_workers', op: 'gte', value: 999 }, { metric: 'my_soldiers', op: 'gte', value: 999 }] },
+  ]);
+  check('no member holding means the rule does not fire', evaluateRules(noneHold.definition, metrics).activeRuleIds.length === 0);
+
+  // Clauses are still ANDed with each other.
+  const mixed = build([
+    { metric: 'sim_seconds', op: 'gte', value: 50 },
+    { any_of: [{ metric: 'my_soldiers', op: 'lt', metric2: 'enemy_soldiers' }] },
+  ]);
+  check('a group and a plain clause are ANDed together', evaluateRules(mixed.definition, metrics).activeRuleIds.length === 1);
+
+  // Malformed forms must be rejected by path, not silently accepted.
+  const badMetric2 = build([{ metric: 'my_soldiers', op: 'lt', metric2: 'vibes' }]);
+  check('an unknown metric2 is rejected with its path', badMetric2.definition.rules.length === 0 && badMetric2.issues.some((i) => i.path.includes('metric2')));
+  const emptyGroup = build([{ any_of: [] }]);
+  check('an empty any_of is rejected', emptyGroup.definition.rules.length === 0 && emptyGroup.issues.some((i) => i.path.includes('any_of')));
+  const noValue = build([{ metric: 'my_soldiers', op: 'gte' }]);
+  check('a condition with neither value nor metric2 is rejected', noValue.definition.rules.length === 0);
+  const both = build([{ metric: 'my_soldiers', op: 'lt', value: 3, metric2: 'enemy_soldiers' }]);
+  check('having both value and metric2 is reported but metric2 wins', both.definition.rules.length === 1 && both.issues.some((i) => i.message.includes('metric2')));
+
+  // Existing definitions must be untouched.
+  const before = new Simulation({ seed: 'compat', timeLimitSeconds: 600, definitions: [def('a', 'boom'), def('b', 'rush')] });
+  before.run(6001);
+  check('plain value conditions still work exactly as before', before.finished && before.colonies[0].lifetimeFoodGathered > 0);
 }
 
 console.log('the ladder');

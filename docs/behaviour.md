@@ -50,7 +50,12 @@ ones. It is not first match wins. That layering is deliberate: put broad phase
 rules near the top and emergency overrides at the bottom, so a "defend the nest"
 clause at the end can override an attack order earlier in the list.
 
-Conditions within one rule are ANDed. For an OR, write two rules.
+Clauses in `when` are ANDed with each other. Each clause is one of:
+
+- `{metric, op, value}`, comparing a metric against a constant.
+- `{metric, op, metric2}`, comparing two metrics, so "I have fewer soldiers than
+  they do" can be stated directly rather than guessed as a threshold.
+- `{any_of: [...]}`, a group where one comparison holding is enough.
 
 ### Stopping a rule from flapping
 
@@ -83,7 +88,7 @@ and in the match record. Invalid numbers are clamped rather than rejected.
 Nothing else changes a colony's knobs during a match. There is no operator, no
 override, no external call.
 
-## The eight knobs
+## The nine knobs
 
 ### unit_production_ratio
 
@@ -207,6 +212,22 @@ A colony at its population ceiling will still build a queen if `target_nests`
 calls for one, since expanding is the only way to raise the ceiling. Losing a
 queen destroys her nest but not the colony: you are only eliminated when your
 last queen dies.
+
+### expansion_bias
+
+Which way a new queen leans when choosing between candidate sites.
+`target_nests` says how many nests you want; this says where they go.
+
+- `toward_food` takes the richest reachable cluster. The default, and what the
+  simulation did before this knob existed.
+- `toward_enemy` settles forward. That extends how far `contest_enemy_food` and
+  `guard_food` can reach, since both are limited by distance from your nearest
+  nest, but it puts a queen and her 200 food of investment closer to their army.
+- `toward_safety` keeps new nests behind your existing ones. Slower to pay off,
+  harder to kill.
+
+Measured on one seed with `target_nests: 4`, mean distance from a new nest to the
+nearest enemy nest: 121 cells forward, 143 neutral, 160 safe.
 
 ### recycle_surplus
 
