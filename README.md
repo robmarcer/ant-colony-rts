@@ -361,6 +361,9 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
   says how many nests it wants, not where they go.
 - The food stockpile is shared across a colony's nests rather than held per nest.
 - Combat is a per-tick exchange with no facing, formations or splash.
+- Units have a radius and push each other aside by separation steering rather
+  than hard collision, which compresses crowds instead of deadlocking them.
+  Measured across a match, 0.06% of unit pairs overlap and 1 unit in 160 stalls.
 - Pheromone trails are not modelled. Colony intel is a shared memory list. The
   viewer's `intel` toggle draws it as spokes from the nest, which is the same
   information without pretending to be a trail.

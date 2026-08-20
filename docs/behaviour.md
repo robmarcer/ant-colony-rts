@@ -143,7 +143,9 @@ currently working, then large piles, then piles closer to the enemy than to you,
 minus a penalty for distance from your own nests and, if `risk_tolerance` is low,
 a penalty for sitting near their nest. Guards are assigned in pairs, because a
 lone soldier loses to four or five massed workers, and coverage grows with army
-size up to six piles.
+size up to six piles. A guard walks to its pile and then holds, rather than
+driving at the exact centre, which would have it oscillate against the units it
+is standing among.
 
 A post is held until the pile is exhausted. That stickiness is deliberate. An
 earlier version re-chose every tick and guards spent the match walking between
@@ -309,6 +311,18 @@ units walks within vision range of it (12 cells for a worker, 14 for a soldier,
 12 for a queen). Idle workers pick targets from that shared memory, which is the
 intel mechanic. Scouting has real value because unexplored food is invisible to
 your foragers even though the map is otherwise open.
+
+## Ants take up space
+
+Units have a radius and push each other aside: 0.45 for a worker, 0.6 for a
+soldier, 1.6 for a queen, who is an immovable obstacle once settled. It is
+separation steering, not hard collision, so crowds compress and flow rather than
+jamming.
+
+What it means for a strategy: a busy pile is genuinely slower to work, because
+your workers queue for it. A ball of soldiers arrives spread out rather than as a
+point. Measured, throughput went up rather than down, because the artificial
+crowding penalty that used to stand in for this was over-correcting.
 
 ## Sieges
 

@@ -14,11 +14,15 @@ import {
   QUEEN_ARMOUR,
   QUEEN_MAX_ATTACKERS,
   SCORE_WEIGHTS,
+  SEPARATION_INTERVAL,
+  SEPARATION_MAX_STEP,
+  SEPARATION_STRENGTH,
   STALEMATE_UNIT_TOLERANCE,
   STALEMATE_WINDOW_SECONDS,
   STARTING_FOOD,
   STARTING_WORKERS,
   TICKS_PER_SECOND,
+  UNIT_RADIUS,
   UNIT_STATS,
 } from './config.js';
 import { HOME_NEST_POSITIONS, generateFood } from './world.js';
@@ -561,6 +565,7 @@ export class Simulation {
       this.regenInNest(unit);
     }
 
+    if (this.tick % SEPARATION_INTERVAL === 0) this.applySeparation();
     this.resolveCombat();
     this.checkAlarms();
     this.checkProgress();
@@ -646,6 +651,72 @@ export class Simulation {
     if (unit.hp >= unit.maxHp) return;
     if (this.distanceToNearestNest(unit.owner, unit) > NEST_RADIUS) return;
     unit.hp = Math.min(unit.maxHp, unit.hp + unit.maxHp * NEST_REGEN_PER_SECOND * DT);
+  }
+
+  /**
+   * Push overlapping units apart. Both colonies at once: an ant gets out of the
+   * way of whoever is in front of it, not only of its own side.
+   *
+   * Strictly two phase. Every displacement is computed from the positions as
+   * they are now, then all of them are applied, so the outcome cannot depend on
+   * iteration order. A settled queen is an immovable obstacle: she pushes and is
+   * not pushed.
+   */
+  private applySeparation(): void {
+    // Units have moved since the roster was built, so refresh the buckets first
+    // or neighbour lookups work from stale cells.
+    this.rebuildRoster();
+
+    const displacement = new Map<number, { dx: number; dy: number }>();
+    const maxRadius = Math.max(...Object.values(UNIT_RADIUS));
+
+    for (const id of [0, 1] as ColonyId[]) {
+      for (const unit of this.roster[id]) {
+        // A queen only moves while she is walking to found a nest.
+        if (unit.type === 'queen' && unit.foundingSite === null) continue;
+        const radius = UNIT_RADIUS[unit.type];
+        let dx = 0;
+        let dy = 0;
+
+        for (const otherOwner of [0, 1] as ColonyId[]) {
+          for (const other of this.near(otherOwner, unit, radius + maxRadius)) {
+            if (other.id === unit.id) continue;
+            const minimum = radius + UNIT_RADIUS[other.type];
+            const ox = unit.x - other.x;
+            const oy = unit.y - other.y;
+            const distance = Math.hypot(ox, oy);
+            if (distance >= minimum) continue;
+
+            const overlap = minimum - distance;
+            if (distance < 1e-6) {
+              // Exactly co-located, so there is no direction to push along.
+              // Derive one from the ids, which keeps it deterministic.
+              const angle = ((unit.id * 2654435761) % 6283) / 1000;
+              dx += Math.cos(angle) * overlap * SEPARATION_STRENGTH;
+              dy += Math.sin(angle) * overlap * SEPARATION_STRENGTH;
+              continue;
+            }
+            dx += (ox / distance) * overlap * SEPARATION_STRENGTH;
+            dy += (oy / distance) * overlap * SEPARATION_STRENGTH;
+          }
+        }
+
+        if (dx === 0 && dy === 0) continue;
+        const magnitude = Math.hypot(dx, dy);
+        if (magnitude > SEPARATION_MAX_STEP) {
+          dx = (dx / magnitude) * SEPARATION_MAX_STEP;
+          dy = (dy / magnitude) * SEPARATION_MAX_STEP;
+        }
+        displacement.set(unit.id, { dx, dy });
+      }
+    }
+
+    for (const [unitId, { dx, dy }] of displacement) {
+      const unit = this.units.get(unitId);
+      if (!unit) continue;
+      unit.x = Math.min(MAP_WIDTH, Math.max(0, unit.x + dx));
+      unit.y = Math.min(MAP_HEIGHT, Math.max(0, unit.y + dy));
+    }
   }
 
   private resolveCombat(): void {

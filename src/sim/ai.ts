@@ -12,6 +12,7 @@ import {
   GUARDS_PER_PILE,
   GUARD_ACTIVITY_RADIUS,
   GUARD_DENIAL_CAP,
+  GUARD_HOLD_RADIUS,
   GUARD_LEASH,
   GUARD_MAX_RANGE,
   GUARD_MIN_FOOD,
@@ -426,12 +427,6 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
     return;
   }
 
-  const assigned = new Map<number, number>();
-  for (const other of sim.unitsOf(colony.id)) {
-    if (other.targetFoodId === null) continue;
-    assigned.set(other.targetFoodId, (assigned.get(other.targetFoodId) ?? 0) + 1);
-  }
-
   let best = known[0];
   let bestScore = -Infinity;
   for (const candidate of known) {
@@ -461,8 +456,8 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
         break;
     }
 
-    // Crowding penalty, so a colony spreads over several sources.
-    score -= (assigned.get(candidate.foodId) ?? 0) * 3;
+    // No crowding penalty here any more: workers physically queue at a busy
+    // pile now, so congestion is real and counting it twice would over-correct.
 
     // risk_tolerance also governs economic risk: cautious colonies discount
     // food that sits in the enemy's back yard.
@@ -554,14 +549,14 @@ function soldierAi(sim: Simulation, unit: Unit): void {
     }
     if (target) return engage(sim, unit, target);
 
-    // Stand slightly off the pile so guards do not stack on one point.
-    const station: Vec = {
-      x: post.x + Math.cos(index * 2.4) * 2,
-      y: post.y + Math.sin(index * 2.4) * 2,
-    };
+    // Walk to the pile, then hold. Guards used to be fanned around a ring by
+    // unit index; separation spreads them now, but only if they stop driving at
+    // the same point once they are there.
     unit.targetEnemyId = null;
     unit.state = 'guarding';
-    moveToward(unit, station, stats.speed);
+    if (Math.hypot(post.x - unit.x, post.y - unit.y) > GUARD_HOLD_RADIUS) {
+      moveToward(unit, post, stats.speed);
+    }
     return;
   }
 
@@ -597,10 +592,13 @@ function soldierAi(sim: Simulation, unit: Unit): void {
   }
   if (intercept && willEngage(sim, unit, strategy)) return engage(sim, unit, intercept);
 
-  const station: Vec = {
-    x: anchor.x + Math.cos(index * 2.4) * (NEST_RADIUS + 2),
-    y: anchor.y + Math.sin(index * 2.4) * (NEST_RADIUS + 2),
-  };
+  // Hold just outside the nest. No ring offset: separation spreads defenders
+  // around the anchor without the index arithmetic that used to fake it.
+  const toAnchor = Math.hypot(anchor.x - unit.x, anchor.y - unit.y);
+  const station: Vec =
+    toAnchor > NEST_RADIUS + 2
+      ? anchor
+      : { x: unit.x, y: unit.y };
   unit.targetEnemyId = null;
   unit.state = 'guarding';
   moveToward(unit, station, stats.speed);

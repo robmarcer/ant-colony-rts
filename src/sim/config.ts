@@ -183,6 +183,30 @@ export const DEPOSIT_RADIUS = 2.5;
 /** Fraction of max hp regenerated per second while inside your own nest. */
 export const NEST_REGEN_PER_SECOND = 0.03;
 
+/**
+ * Ants take up space and push each other aside.
+ *
+ * Separation steering rather than hard collision: each unit is nudged away from
+ * neighbours it overlaps, blended with wherever it was already going. Hard
+ * collision jams at chokepoints and can deadlock, which matters because every
+ * colony funnels its workers into a deposit radius of 2.5 cells.
+ *
+ * Displacements are computed for every unit before any of them are applied. Done
+ * in place, the result would depend on the order units happened to be iterated,
+ * and determinism is the property this whole project rests on.
+ */
+export const UNIT_RADIUS: Record<UnitType, number> = {
+  queen: 1.6,
+  worker: 0.45,
+  soldier: 0.6,
+};
+/** How hard an overlap pushes, as a fraction of the overlap per application. */
+export const SEPARATION_STRENGTH = 0.5;
+/** Cap per application, so a dense crowd cannot fling a unit across the map. */
+export const SEPARATION_MAX_STEP = 0.35;
+/** Ticks between separation passes. Every other tick is smooth enough. */
+export const SEPARATION_INTERVAL = 2;
+
 /** Distance at which a unit is considered to have arrived at a move target. */
 export const ARRIVE_EPSILON = 0.6;
 /** Distance at which a worker can gather from a source. */
@@ -225,6 +249,17 @@ export const GUARD_ACTIVITY_RADIUS = 15;
  * enemy nest.
  */
 export const GUARD_LEASH = 12;
+/**
+ * A guard this close to its post has arrived and stops.
+ *
+ * Without it, every guard drives at the exact centre of the pile, separation
+ * pushes them apart, and they walk straight back in: they oscillate instead of
+ * intercepting. The index-based ring offset this replaces was doing more than
+ * stopping them drawing on top of each other, it was giving each guard a
+ * distinct destination. This does the same job as a behaviour rather than as
+ * arithmetic on a unit id.
+ */
+export const GUARD_HOLD_RADIUS = 3;
 /**
  * Caps on how much the denial term can swing a post choice. Uncapped, the pile
  * with the highest denial value is always the one touching the enemy's nest,

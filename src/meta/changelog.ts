@@ -39,6 +39,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.20.0',
+    timestamp: '2026-08-20T18:17:51+07:00',
+    title: 'Ants navigate around each other',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'Units have a radius and push each other aside: 0.45 for a worker, 0.6 for a soldier, 1.6 for a queen, who is an immovable obstacle once settled. Separation steering rather than hard collision, so crowds compress and flow instead of jamming at the 2.5 cell deposit radius every colony funnels into.' },
+      { area: 'sim', detail: 'Strictly two phase: every displacement is computed from current positions and then all are applied, so the result cannot depend on the order units were iterated. Determinism holds, verified by the same-seed fingerprint and tick-by-tick checks passing unchanged.' },
+      { area: 'ai', detail: 'Removed the artificial crowding penalty of 3 per worker already assigned to a food source. Workers physically queue at a busy pile now, so counting congestion twice over-corrected.' },
+      { area: 'ai', detail: 'Removed the index-based ring offsets that fanned guards and nest defenders around a circle. Both were described as cosmetic when the issue was written, and one of them was not: the ring gave each guard a distinct destination. Without it they all drove at the exact centre of the pile, separation pushed them out, they walked back in, and they oscillated instead of intercepting. Two guard tests caught it. Replaced with a genuine behaviour: walk to the pile, then hold within 3 cells.', fix: true },
+      { area: 'balance', detail: 'Measured across a match: 0.056% of unit pairs overlap, 1 unit in 160 stalls while not idle or guarding, and food throughput rose rather than fell, from 835 to 1000 a minute for the same definition, because the crowding penalty had been over-correcting.' },
+      { area: 'tooling', detail: 'Ladder ratings gained a regularising prior of one virtual game. Unregularised Bradley-Terry is unbounded below for a competitor that never wins, and the first re-measured ladder reported preset-harass at -900 on a 0 from 32 record: arithmetically right and useless to read. It now reports 523, and an even record still gives exactly equal ratings.', fix: true },
+      { area: 'balance', detail: 'Field re-measured after the change: preset-boom 2227, preset-blockade 1946, example-adaptive 1790, preset-scout 1719, example-mass-rush 1613, preset-balanced 1577, preset-turtle 1195, preset-rush 909, preset-harass 523.' },
+    ],
+  },
+  {
     version: '0.19.0',
     timestamp: '2026-08-20T18:01:12+07:00',
     title: 'Richer rule conditions, an expansion bias, and a layout fix',

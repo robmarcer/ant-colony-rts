@@ -51,6 +51,17 @@ function keyOf(id: string, version: number | undefined): string {
  * Bradley-Terry strengths by the standard MM update. Converges quickly and is
  * independent of the order results are supplied in, which is the point.
  */
+/**
+ * Half a win and half a loss against a virtual average opponent, added to every
+ * competitor.
+ *
+ * Without it, Bradley-Terry is unbounded below for anyone who never wins: the
+ * first ladder reported preset-harass at -900 on a 0 from 32 record, which is
+ * arithmetically right and useless to read. The prior is small enough not to
+ * move a competitor with a real record, and it keeps a whitewash finite.
+ */
+const PRIOR_GAMES = 1;
+
 function bradleyTerry(
   competitors: string[],
   wins: Map<string, number>,
@@ -70,10 +81,10 @@ function bradleyTerry(
         if (n === 0) continue;
         denominator += n / (strength.get(a)! + strength.get(b)!);
       }
-      const w = wins.get(a) ?? 0;
-      // A competitor with no wins would go to zero and take the log with it, so
-      // hold it at a small floor instead.
-      next.set(a, denominator > 0 && w > 0 ? w / denominator : 1e-6);
+      // The virtual opponent has strength 1 by definition of the normalisation.
+      denominator += PRIOR_GAMES / (strength.get(a)! + 1);
+      const w = (wins.get(a) ?? 0) + PRIOR_GAMES / 2;
+      next.set(a, w / denominator);
     }
     // Normalise to a geometric mean of 1 so the scale cannot drift.
     const logs = [...next.values()].map((v) => Math.log(v));
