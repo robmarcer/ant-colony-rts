@@ -72,6 +72,14 @@ export interface BehaviourRule {
   when: RuleCondition[];
   /** Any subset of the knobs. Later matching rules win. */
   set: Partial<StrategyConfig>;
+  /**
+   * Once this rule fires, keep it active for at least this many sim seconds even
+   * if its condition stops holding. Without it, a rule sitting on a threshold
+   * the match keeps crossing will switch on and off repeatedly, and a colony
+   * that keeps committing and recalling its army achieves nothing. 0 or absent
+   * means no hold, which is the old behaviour.
+   */
+  min_hold_seconds?: number;
 }
 
 export interface BehaviourDefinition {
@@ -213,11 +221,23 @@ export function parseDefinition(raw: unknown, fallbackId = 'unnamed'): ParsedDef
       return;
     }
 
+    let hold: number | undefined;
+    if (rawRule?.min_hold_seconds !== undefined) {
+      const raw = Number(rawRule.min_hold_seconds);
+      if (!Number.isFinite(raw) || raw < 0) {
+        issues.push({ path: `${path}.min_hold_seconds`, message: 'must be a number of seconds >= 0, ignored', severity: 'error' });
+      } else {
+        if (raw > 3600) issues.push({ path: `${path}.min_hold_seconds`, message: 'over 3600, clamped', severity: 'error' });
+        hold = Math.min(3600, Math.round(raw));
+      }
+    }
+
     rules.push({
       id: ruleId,
       note: typeof rawRule?.note === 'string' ? rawRule.note : undefined,
       when,
       set,
+      min_hold_seconds: hold,
     });
   });
 
@@ -262,5 +282,5 @@ export const DEFINITION_DOC = {
   rule_ops: RULE_OPS,
   rule_eval_interval_seconds: RULE_EVAL_INTERVAL_SECONDS,
   evaluation:
-    'Every rule whose conditions all hold is applied in list order on top of base. Later rules override earlier ones. Nothing else changes the knobs during a match.',
+    'Every rule whose conditions all hold is applied in list order on top of base. Later rules override earlier ones. Nothing else changes the knobs during a match. A rule with min_hold_seconds stays active for at least that long after it first fires, even if its condition lapses.',
 } as const;

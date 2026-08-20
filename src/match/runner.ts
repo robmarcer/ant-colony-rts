@@ -220,6 +220,9 @@ function ruleActivityFor(sim: Simulation, id: ColonyId): RuleActivity[] {
   return [...activity.values()];
 }
 
+/** Activations above this in one match are reported as flapping. */
+export const FLAP_WARNING_THRESHOLD = 3;
+
 /** Plain text digest. Deliberately compact and dense in numbers. */
 export function renderDigest(record: MatchRecord, series: SeriesSample[]): string {
   const [a, b] = record.colonies;
@@ -252,8 +255,12 @@ export function renderDigest(record: MatchRecord, series: SeriesSample[]): strin
       lines.push('    rules: none defined');
     } else {
       for (const rule of rules) {
+        // Repeated activation is nearly always a threshold sitting where the
+        // match keeps crossing it, not something the author intended.
+        const flapping = rule.activations > FLAP_WARNING_THRESHOLD;
         lines.push(
           `    rule ${rule.ruleId}: ${rule.activations === 0 ? 'NEVER FIRED' : `${rule.activations}x, ${rule.secondsActive}s active, first at ${rule.firstActivatedAt}s`}` +
+            (flapping ? ' FLAPPING, consider min_hold_seconds' : '') +
             (rule.note ? ` (${rule.note})` : ''),
         );
       }

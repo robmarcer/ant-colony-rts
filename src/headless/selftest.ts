@@ -302,6 +302,63 @@ console.log('closed system');
   }
 }
 
+console.log('rule hysteresis');
+{
+  const flappyRule = (hold?: number) =>
+    parse(
+      {
+        id: 'flappy',
+        name: 'flappy',
+        base: PRESETS.balanced,
+        rules: [
+          {
+            id: 'on-a-threshold',
+            when: [{ metric: 'food_stockpile', op: 'gte', value: 120 }],
+            set: { aggression: 0.6 },
+            ...(hold === undefined ? {} : { min_hold_seconds: hold }),
+          },
+        ],
+      },
+      'flappy',
+    ).definition;
+
+  const countActivations = (definition: ReturnType<typeof flappyRule>): number => {
+    const sim = new Simulation({ seed: 'flap', timeLimitSeconds: 600, definitions: [definition, def('b', 'boom')] });
+    sim.run(6001);
+    return sim.events.filter((e) => e.type === 'rule_activated' && e.colony === 0).length;
+  };
+
+  const without = countActivations(flappyRule());
+  check('a rule on a crossed threshold flaps without a hold', without > 1, `${without} activations`);
+
+  const withHold = countActivations(flappyRule(600));
+  check('min_hold_seconds stops the flapping', withHold === 1, `${withHold} activations`);
+  check('the hold genuinely reduced the count', withHold < without, `${withHold} vs ${without}`);
+
+  const parsed = parse(
+    {
+      id: 'holds',
+      name: 'holds',
+      base: PRESETS.balanced,
+      rules: [
+        { id: 'ok', when: [{ metric: 'my_workers', op: 'gte', value: 1 }], set: { aggression: 0.5 }, min_hold_seconds: 30 },
+        { id: 'huge', when: [{ metric: 'my_workers', op: 'gte', value: 1 }], set: { aggression: 0.5 }, min_hold_seconds: 99999 },
+        { id: 'bad', when: [{ metric: 'my_workers', op: 'gte', value: 1 }], set: { aggression: 0.5 }, min_hold_seconds: -5 },
+      ],
+    },
+    'holds',
+  );
+  check('a valid hold is kept', parsed.definition.rules[0].min_hold_seconds === 30);
+  check('an oversized hold is clamped', parsed.definition.rules[1].min_hold_seconds === 3600);
+  check('a negative hold is rejected and the rule still runs', parsed.definition.rules[2].min_hold_seconds === undefined);
+  check('the rejection is reported', parsed.issues.some((i) => i.path.includes('min_hold_seconds')));
+
+  // A definition that sets no hold must behave exactly as before.
+  const before = new Simulation({ seed: 'nohold', timeLimitSeconds: 600, definitions: [def('a', 'harass'), def('b', 'boom')] });
+  before.run(6001);
+  check('definitions without a hold are unaffected', before.finished && before.colonies[0].ruleActiveSince.size === 0);
+}
+
 console.log('stalemate detection');
 {
   const stagnant = new Simulation({

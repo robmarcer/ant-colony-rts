@@ -115,6 +115,8 @@ export interface Colony {
   strategy: StrategyConfig;
   /** Ids of the rules currently firing, for the HUD and the match log. */
   activeRuleIds: string[];
+  /** Tick each active rule first fired, used to honour min_hold_seconds. */
+  ruleActiveSince: Map<string, number>;
   strategyChangedTick: number;
   knownFood: Map<number, KnownFood>;
   unitsProduced: Record<UnitType, number>;

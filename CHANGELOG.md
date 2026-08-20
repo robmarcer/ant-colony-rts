@@ -1,10 +1,31 @@
 # Changelog
 
-Current version: **0.8.0**. 8 releases, 62 recorded changes.
+Current version: **0.9.0**. 9 releases, 67 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.9.0 — Rules can hold, and flapping is reported
+
+2026-08-20 14:41 (UTC+07:00) · committed · 5 changes
+
+**Simulation**
+
+- Fix: New optional min_hold_seconds on a rule: once it fires it stays active for at least that long even if its condition lapses. A rule whose threshold sits where the match keeps crossing it was previously switching on and off repeatedly, and one recorded match had a rule fire eight times, so the colony kept committing its army and recalling it.
+- A held rule keeps its position in the list, so a hold cannot change the layering precedence a definition was written to rely on.
+
+**API**
+
+- Fix: The digest flags any rule activating more than three times with "FLAPPING, consider min_hold_seconds", so an author does not have to notice it themselves.
+
+**Tests**
+
+- Eight checks: a threshold rule flaps without a hold and fires exactly once with one, oversized holds are clamped, negative ones are rejected and reported while the rule still runs, and a definition setting no hold is provably unaffected.
+
+**Docs**
+
+- docs/behaviour.md gains a section on flapping, and GET /api/schema documents min_hold_seconds.
 
 ## 0.8.0 — Stalemated matches end instead of running the clock out
 

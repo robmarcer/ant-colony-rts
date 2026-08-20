@@ -39,6 +39,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.0',
+    timestamp: '2026-08-20T14:41:46+07:00',
+    title: 'Rules can hold, and flapping is reported',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'New optional min_hold_seconds on a rule: once it fires it stays active for at least that long even if its condition lapses. A rule whose threshold sits where the match keeps crossing it was previously switching on and off repeatedly, and one recorded match had a rule fire eight times, so the colony kept committing its army and recalling it.', fix: true },
+      { area: 'sim', detail: 'A held rule keeps its position in the list, so a hold cannot change the layering precedence a definition was written to rely on.' },
+      { area: 'api', detail: 'The digest flags any rule activating more than three times with "FLAPPING, consider min_hold_seconds", so an author does not have to notice it themselves.', fix: true },
+      { area: 'docs', detail: 'docs/behaviour.md gains a section on flapping, and GET /api/schema documents min_hold_seconds.' },
+      { area: 'tests', detail: 'Eight checks: a threshold rule flaps without a hold and fires exactly once with one, oversized holds are clamped, negative ones are rejected and reported while the rule still runs, and a definition setting no hold is provably unaffected.' },
+    ],
+  },
+  {
     version: '0.8.0',
     timestamp: '2026-08-20T14:39:21+07:00',
     title: 'Stalemated matches end instead of running the clock out',

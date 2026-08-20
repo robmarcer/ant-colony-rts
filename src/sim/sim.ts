@@ -154,6 +154,7 @@ export class Simulation {
       definition,
       strategy: { ...definition.base },
       activeRuleIds: [],
+      ruleActiveSince: new Map(),
       strategyChangedTick: 0,
       knownFood: new Map(),
       unitsProduced: { queen: 1, worker: STARTING_WORKERS, soldier: 0 },
@@ -364,7 +365,18 @@ export class Simulation {
   private evaluateBehaviour(): void {
     for (const colony of this.colonies) {
       const metrics = computeMetrics(this, colony.id);
-      const { strategy, activeRuleIds } = evaluateRules(colony.definition, metrics);
+
+      // Rules still inside their minimum hold stay active even if their
+      // condition has lapsed, which is what stops a rule flapping on a
+      // threshold the match keeps crossing.
+      const held = new Set<string>();
+      for (const [ruleId, since] of colony.ruleActiveSince) {
+        const rule = colony.definition.rules.find((candidate) => candidate.id === ruleId);
+        const hold = rule?.min_hold_seconds ?? 0;
+        if (hold > 0 && this.tick < since + hold * TICKS_PER_SECOND) held.add(ruleId);
+      }
+
+      const { strategy, activeRuleIds } = evaluateRules(colony.definition, metrics, held);
 
       const before = colony.activeRuleIds;
       for (const id of activeRuleIds) {
@@ -390,6 +402,12 @@ export class Simulation {
       }
       colony.strategy = strategy;
       colony.activeRuleIds = activeRuleIds;
+      for (const id of activeRuleIds) {
+        if (!colony.ruleActiveSince.has(id)) colony.ruleActiveSince.set(id, this.tick);
+      }
+      for (const id of [...colony.ruleActiveSince.keys()]) {
+        if (!activeRuleIds.includes(id)) colony.ruleActiveSince.delete(id);
+      }
     }
   }
 

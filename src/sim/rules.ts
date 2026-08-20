@@ -88,14 +88,24 @@ export interface RuleEvaluation {
  * Apply every matching rule on top of base, in list order, later wins.
  * Deliberately not first-match-wins: layering lets a definition express
  * "always do X after 3 minutes" and "but if the nest is being hit, do Y".
+ *
+ * `held` are rules whose conditions no longer hold but whose min_hold_seconds
+ * has not expired. They stay in the layering in their original list position,
+ * so a hold cannot change the precedence a definition was written to rely on.
  */
-export function evaluateRules(definition: BehaviourDefinition, metrics: Metrics): RuleEvaluation {
+export function evaluateRules(
+  definition: BehaviourDefinition,
+  metrics: Metrics,
+  held: ReadonlySet<string> = new Set(),
+): RuleEvaluation {
   let strategy: StrategyConfig = { ...definition.base };
   const activeRuleIds: string[] = [];
 
   definition.rules.forEach((rule, index) => {
-    if (!rule.when.every((condition) => conditionHolds(condition, metrics))) return;
-    activeRuleIds.push(rule.id ?? `rule_${index}`);
+    const id = rule.id ?? `rule_${index}`;
+    const matches = rule.when.every((condition) => conditionHolds(condition, metrics));
+    if (!matches && !held.has(id)) return;
+    activeRuleIds.push(id);
     strategy = { ...strategy, ...rule.set };
   });
 

@@ -290,7 +290,7 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
 
 ## Verification
 
-`npm run selftest` asserts 58 properties, including:
+`npm run selftest` asserts 81 properties, including:
 
 - the same seed produces an identical state fingerprint, and stepping tick by
   tick equals running in bulk
@@ -308,6 +308,11 @@ Re-run `npm run match -- --round-robin --seeds 1,2` after any change to
   not, and a fought-over match leaves piles worth more than a worker can carry
 - energy is conserved: total energy on the map does not drift across a whole
   match, including when a queen dies part way through building a unit
+- stored matches are pinned to the code that made them, and replay is refused
+  for a mismatched version, mismatched balance numbers, or a missing stamp
+- a stalemated match ends early while a decisive one is untouched
+- `min_hold_seconds` stops a rule flapping, and a definition without it is
+  unaffected
 - the changelog is well formed: unique semver versions, parseable timestamps
   carrying an offset, newest first, every entry has changes, `APP_VERSION`
   matches the newest entry, and a reconstructed entry never claims a commit

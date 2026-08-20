@@ -48,6 +48,30 @@ clause at the end can override an attack order earlier in the list.
 
 Conditions within one rule are ANDed. For an OR, write two rules.
 
+### Stopping a rule from flapping
+
+A rule whose threshold sits where the match keeps crossing it will switch on and
+off repeatedly. A colony that keeps committing its army and recalling it achieves
+nothing, and this is easy to do by accident: one recorded match had a rule fire
+eight times in a single game.
+
+Add `min_hold_seconds` to keep a rule active for at least that long once it
+fires, even if its condition lapses:
+
+```json
+{
+  "id": "commit",
+  "when": [{ "metric": "my_soldiers", "op": "gte", "value": 12 }],
+  "set": { "aggression": 1.0, "soldier_posture": "attack_enemy_nest" },
+  "min_hold_seconds": 120
+}
+```
+
+The match log flags any rule that activates more than three times with
+`FLAPPING, consider min_hold_seconds`, so you do not have to spot it yourself.
+A held rule keeps its position in the list, so holding cannot change the
+precedence your other rules rely on.
+
 A rule that sets nothing, has no conditions, names an unknown metric, or names
 an unknown knob is dropped, and the reason appears in the definition's `issues`
 and in the match record. Invalid numbers are clamped rather than rejected.
@@ -254,9 +278,10 @@ saving.
 - The `battlefield` line, which says how much food is sitting in corpse piles and
   how big the largest is. A large pile you never hauled from is income you left
   on the floor.
-- The activation count. A rule that fired 8 times was flapping on and off around
-  its threshold. Widen the gap between the rule that turns behaviour on and the
-  one that turns it off.
+- The activation count, and any `FLAPPING` flag. A rule that fired 8 times was
+  switching on and off around its threshold. Either widen the gap between the
+  rule that turns behaviour on and the one that turns it off, or give it
+  `min_hold_seconds`.
 - `produced` against `lost`. Producing 49 soldiers and losing 47 for 20 kills is
   the trickle failure.
 - The final `food` figure. A large stockpile means production capacity, not food,
