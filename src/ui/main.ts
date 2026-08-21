@@ -29,6 +29,7 @@ const seedInput = el<HTMLInputElement>('seed');
 const limitInput = el<HTMLInputElement>('limit');
 const showIntel = el<HTMLInputElement>('showIntel');
 const fogView = el<HTMLSelectElement>('fogView');
+const zoomLevel = el<HTMLSpanElement>('zoomLevel');
 const playPause = el<HTMLButtonElement>('playPause');
 const eventLog = el<HTMLOListElement>('eventLog');
 const summary = el<HTMLDivElement>('summary');
@@ -184,6 +185,7 @@ function render(): void {
   });
   updatePanels();
   appendEvents();
+  zoomLevel.textContent = `${renderer.getView().zoom.toFixed(1)}x`;
   const progress = Math.min(1, sim.tick / sim.timeLimitTicks);
   el<HTMLDivElement>('progressFill').style.width = `${progress * 100}%`;
   el<HTMLSpanElement>('clock').textContent = `${Math.floor(sim.simSeconds)}s / ${sim.timeLimitSeconds}s`;
@@ -430,6 +432,73 @@ document.querySelector('.speeds button[data-speed="2"]')?.classList.add('active'
 pastSelect.onchange = () => {
   if (pastSelect.value) void replayMatch(pastSelect.value);
 };
+
+// ------------------------------------------------------------------ view input
+
+/**
+ * Wheel zooms toward the pointer. passive: false because the page scrolls
+ * otherwise, and zooming the map while the document jumps is unusable.
+ */
+canvas.addEventListener(
+  'wheel',
+  (event) => {
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    renderer.zoomAt(event.clientX - rect.left, event.clientY - rect.top, Math.exp(-event.deltaY * 0.0015));
+  },
+  { passive: false },
+);
+
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+
+canvas.addEventListener('pointerdown', (event) => {
+  dragging = true;
+  lastX = event.clientX;
+  lastY = event.clientY;
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  if (!dragging) return;
+  renderer.panBy(event.clientX - lastX, event.clientY - lastY);
+  lastX = event.clientX;
+  lastY = event.clientY;
+});
+
+for (const type of ['pointerup', 'pointercancel'] as const) {
+  canvas.addEventListener(type, () => {
+    dragging = false;
+    canvas.classList.remove('dragging');
+  });
+}
+
+canvas.addEventListener('dblclick', () => renderer.resetView());
+
+const zoomStep = (factor: number) => {
+  // Anchored on the middle of the view, since there is no pointer involved.
+  const rect = canvas.getBoundingClientRect();
+  renderer.zoomAt(rect.width / 2, rect.height / 2, factor);
+};
+el<HTMLButtonElement>('zoomIn').onclick = () => zoomStep(1.5);
+el<HTMLButtonElement>('zoomOut').onclick = () => zoomStep(1 / 1.5);
+el<HTMLButtonElement>('zoomReset').onclick = () => renderer.resetView();
+
+window.addEventListener('keydown', (event) => {
+  // Arrows pan, plus and minus zoom, 0 fits. Skipped while typing in a field.
+  const target = event.target as HTMLElement | null;
+  if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
+  const step = 40;
+  if (event.key === 'ArrowLeft') return renderer.panBy(step, 0);
+  if (event.key === 'ArrowRight') return renderer.panBy(-step, 0);
+  if (event.key === 'ArrowUp') return renderer.panBy(0, step);
+  if (event.key === 'ArrowDown') return renderer.panBy(0, -step);
+  if (event.key === '+' || event.key === '=') return zoomStep(1.5);
+  if (event.key === '-') return zoomStep(1 / 1.5);
+  if (event.key === '0') return renderer.resetView();
+});
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !docsPanel.classList.contains('hidden')) {

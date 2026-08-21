@@ -79,6 +79,10 @@ canvas {
 
 .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .speeds { display: inline-flex; gap: 4px; }
+.zoomers { display: inline-flex; gap: 4px; align-items: center; }
+.zoomers .clock { min-width: 44px; text-align: center; }
+canvas { cursor: grab; }
+canvas.dragging { cursor: grabbing; }
 .progress { flex: 1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; min-width: 80px; }
 #progressFill { height: 100%; width: 0; background: var(--a); }
 .clock { color: var(--muted); min-width: 88px; text-align: right; }

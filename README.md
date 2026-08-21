@@ -258,6 +258,19 @@ round robins, or the sweep will take most of an hour rather than a minute.
 - No fog of war. Unit positions are global; food still has to be discovered by
   walking within vision range. See "Deliberate simplifications" below.
 
+## Looking closer
+
+The whole map at once puts a worker at about 5px across. The viewer zooms to 8x,
+where a worker is roughly 42px, and pans:
+
+- Scroll wheel zooms toward the pointer, not the centre of the map.
+- Drag to pan, double click or `fit` to return to the whole map.
+- Arrow keys pan, `+` and `-` zoom, `0` fits.
+
+Pan is clamped so the map always fills the view, which is why the default is
+pixel-identical to having no zoom at all: at 1x the transform is a no-op. Reset
+returns to a byte-identical frame, asserted by hashing the canvas.
+
 ## Sieges
 
 A queen has 2,500 health and 2 armour, and at most 6 attackers can reach her at

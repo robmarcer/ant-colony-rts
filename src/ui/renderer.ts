@@ -15,10 +15,28 @@ export interface RenderOptions {
   fogView: -1 | 0 | 1;
 }
 
-/** Top down canvas view. Purely a projection of sim state, holds no state itself. */
+/** Zoom limits. 1 fits the whole map, which is the default and the old view. */
+export const MIN_ZOOM = 1;
+export const MAX_ZOOM = 8;
+
+/**
+ * Top down canvas view.
+ *
+ * Almost a pure projection of sim state, with one deliberate exception: it holds
+ * the view transform, because zoom and pan are properties of how you are looking
+ * rather than of the match. `resize()` recomputes the base scale, so the
+ * transform has to be re-clamped there.
+ */
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
+  /** Device pixels per world cell at zoom 1, so the whole map fits. */
+  private baseScale = 1;
+  /** Device pixels per world cell as currently viewed. */
   private scale = 1;
+  private zoom = 1;
+  /** World coordinate at the top left of the view. */
+  private panX = 0;
+  private panY = 0;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -33,7 +51,69 @@ export class Renderer {
     const size = this.canvas.clientWidth || 720;
     this.canvas.width = Math.round(size * dpr);
     this.canvas.height = Math.round(size * dpr);
-    this.scale = (size * dpr) / MAP_WIDTH;
+    this.baseScale = (size * dpr) / MAP_WIDTH;
+    this.applyZoom(this.zoom);
+  }
+
+  /** How many world cells fit across the view at the current zoom. */
+  private visibleCells(): number {
+    return this.canvas.width / this.scale;
+  }
+
+  /**
+   * Pan is clamped so the map always fills the view. At zoom 1 that pins it to
+   * the origin, which is why the default view is pixel-identical to before zoom
+   * existed, and at any zoom it means the map cannot be lost off screen.
+   */
+  private clampPan(): void {
+    const span = Math.max(0, MAP_WIDTH - this.visibleCells());
+    this.panX = Math.min(span, Math.max(0, this.panX));
+    this.panY = Math.min(span, Math.max(0, this.panY));
+  }
+
+  private applyZoom(zoom: number): void {
+    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+    this.scale = this.baseScale * this.zoom;
+    this.clampPan();
+  }
+
+  /**
+   * Zoom keeping the world point under the cursor where it is. Zooming to the
+   * centre of the map while looking at a corner is worse than not zooming.
+   * Coordinates are CSS pixels relative to the canvas.
+   */
+  zoomAt(cssX: number, cssY: number, factor: number): void {
+    const dpr = window.devicePixelRatio || 1;
+    const px = cssX * dpr;
+    const py = cssY * dpr;
+    const worldX = this.panX + px / this.scale;
+    const worldY = this.panY + py / this.scale;
+
+    this.applyZoom(this.zoom * factor);
+
+    this.panX = worldX - px / this.scale;
+    this.panY = worldY - py / this.scale;
+    this.clampPan();
+  }
+
+  /** Drag the view by a distance in CSS pixels. */
+  panBy(cssDx: number, cssDy: number): void {
+    const dpr = window.devicePixelRatio || 1;
+    this.panX -= (cssDx * dpr) / this.scale;
+    this.panY -= (cssDy * dpr) / this.scale;
+    this.clampPan();
+  }
+
+  resetView(): void {
+    this.panX = 0;
+    this.panY = 0;
+    this.applyZoom(1);
+  }
+
+  /** For the HUD, and for tests that need to assert what is on screen. */
+  getView(): { zoom: number; panX: number; panY: number; pixelsPerCell: number } {
+    const dpr = window.devicePixelRatio || 1;
+    return { zoom: this.zoom, panX: this.panX, panY: this.panY, pixelsPerCell: this.scale / dpr };
   }
 
   draw(sim: Simulation, options: RenderOptions): void {
@@ -41,8 +121,16 @@ export class Renderer {
     const s = this.scale;
     if (Math.abs(this.canvas.clientWidth * (window.devicePixelRatio || 1) - this.canvas.width) > 2) this.resize();
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#0d0b09';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Everything below draws in world coordinates times scale, so panning is a
+    // single translate rather than an offset threaded through every call. That
+    // also keeps the fog ghosts, intel spokes and founding-queen paths aligned
+    // for free, which is the part most likely to drift if done piecemeal.
+    ctx.save();
+    ctx.translate(-this.panX * this.scale, -this.panY * this.scale);
 
     // Faint grid, one line every 10 cells, to give a sense of distance.
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -130,6 +218,8 @@ export class Renderer {
         this.drawGhost(belief.x, belief.y, belief.type, viewer === 0 ? 1 : 0, age);
       }
     }
+
+    ctx.restore();
   }
 
   /**

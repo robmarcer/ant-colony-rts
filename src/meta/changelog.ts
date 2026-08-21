@@ -39,6 +39,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.25.0',
+    timestamp: '2026-08-21T22:43:53+07:00',
+    title: 'Zoom and pan the map',
+    precision: 'commit',
+    changes: [
+      { area: 'ui', detail: 'The viewer zooms from the whole map to 8x and pans. A worker goes from about 5px across to 42px, measured at 29.1 pixels per cell at full zoom, which is what makes drawing anything worth looking at possible.' },
+      { area: 'ui', detail: 'Wheel zooms toward the pointer rather than the centre, since zooming to the middle of the map while watching a corner is worse than not zooming. Drag to pan, double click or the fit button to reset, arrows to pan, plus and minus to zoom, 0 to fit.' },
+      { area: 'ui', detail: 'Implemented as one translate applied before anything is drawn, rather than an offset threaded through each call. Everything already multiplied world coordinates by a scale, so the fog ghosts, intel spokes and founding queen paths stay aligned structurally rather than by being individually corrected.' },
+      { area: 'ui', detail: 'Pan is clamped so the map always fills the view. At 1x that pins it to the origin, so the default view is a no-op transform: verified by hashing the canvas before zooming and after resetting, which returns a byte-identical frame. Panning 4,000px off the map leaves the view still full of map.' },
+      { area: 'ui', detail: 'Renderer was documented as holding no state. It now holds the view transform, which is a property of how you are looking rather than of the match, and the comment says so. resize() recomputes the base scale and re-clamps the transform.' },
+      { area: 'perf', detail: 'Measured 100fps at max simulation speed with fog on and zoomed to 8x, so the ten per-frame loops over units, food, nests and beliefs do not need culling at current unit counts.' },
+    ],
+  },
+  {
     version: '0.24.0',
     timestamp: '2026-08-20T20:21:53+07:00',
     title: 'Fog of war',

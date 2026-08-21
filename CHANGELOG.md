@@ -1,10 +1,26 @@
 # Changelog
 
-Current version: **0.24.0**. 24 releases, 166 recorded changes.
+Current version: **0.25.0**. 25 releases, 172 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.25.0 — Zoom and pan the map
+
+2026-08-21 22:43 (UTC+07:00) · committed · 6 changes
+
+**Performance**
+
+- Measured 100fps at max simulation speed with fog on and zoomed to 8x, so the ten per-frame loops over units, food, nests and beliefs do not need culling at current unit counts.
+
+**Viewer**
+
+- The viewer zooms from the whole map to 8x and pans. A worker goes from about 5px across to 42px, measured at 29.1 pixels per cell at full zoom, which is what makes drawing anything worth looking at possible.
+- Wheel zooms toward the pointer rather than the centre, since zooming to the middle of the map while watching a corner is worse than not zooming. Drag to pan, double click or the fit button to reset, arrows to pan, plus and minus to zoom, 0 to fit.
+- Implemented as one translate applied before anything is drawn, rather than an offset threaded through each call. Everything already multiplied world coordinates by a scale, so the fog ghosts, intel spokes and founding queen paths stay aligned structurally rather than by being individually corrected.
+- Pan is clamped so the map always fills the view. At 1x that pins it to the origin, so the default view is a no-op transform: verified by hashing the canvas before zooming and after resetting, which returns a byte-identical frame. Panning 4,000px off the map leaves the view still full of map.
+- Renderer was documented as holding no state. It now holds the view transform, which is a property of how you are looking rather than of the match, and the comment says so. resize() recomputes the base scale and re-clamps the transform.
 
 ## 0.24.0 — Fog of war
 
