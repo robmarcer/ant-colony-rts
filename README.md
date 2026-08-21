@@ -258,6 +258,18 @@ round robins, or the sweep will take most of an hour rather than a minute.
 - No fog of war. Unit positions are global; food still has to be discovered by
   walking within vision range. See "Deliberate simplifications" below.
 
+## The ground
+
+Soil rather than a flat fill: grain, a broad tonal wash, and sparse grit,
+generated once per match from its seed and blitted, never regenerated per frame.
+
+The interesting constraint is not the look, it is contrast. Everything on screen
+is small and two unit colours are dim, and corpses are brown, which makes them
+the easiest thing to lose against soil. `src/ui/soil.ts` is therefore a pure
+function with no canvas in it, so the self test can assert the mean luminance
+stays under 0.006 and that every unit colour keeps 2.5:1 against the ground,
+including against the bright tail of the texture rather than only its average.
+
 ## Looking closer
 
 The whole map at once puts a worker at about 5px across. The viewer zooms to 8x,

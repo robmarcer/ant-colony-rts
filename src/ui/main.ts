@@ -99,12 +99,23 @@ async function loadLists(): Promise<void> {
 
 // ---------------------------------------------------------------- match control
 
+/** Stable per match, so a replay's ground looks like the original's. */
+function soilSeedFor(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 async function startMatch(aId: string, bId: string, seed: string, timeLimitSeconds: number): Promise<void> {
   const [a, b] = await Promise.all([
     api<{ definition: BehaviourDefinition }>(`/api/definitions/${aId}`),
     api<{ definition: BehaviourDefinition }>(`/api/definitions/${bId}`),
   ]);
   sim = new Simulation({ seed, timeLimitSeconds, definitions: [a.definition, b.definition] });
+  renderer.setSoilSeed(soilSeedFor(seed));
   loggedEvents = 0;
   lastKnobs = ['', ''];
   tickCarry = 0;

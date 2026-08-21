@@ -1,10 +1,25 @@
 # Changelog
 
-Current version: **0.25.0**. 25 releases, 172 recorded changes.
+Current version: **0.26.0**. 26 releases, 177 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.26.0 — The ground looks like soil
+
+2026-08-21 22:50 (UTC+07:00) · committed · 5 changes
+
+**Viewer**
+
+- The map was a flat #0d0b09 fill with a 4% white grid every 10 cells, which read as a technical canvas. It is now soil: per-pixel grain, a broad tonal wash and sparse grit, generated once per match from its seed and blitted rather than regenerated per frame, since draw() runs every frame and a rebuilt texture would crawl and cost frame rate at max speed.
+- Generation lives in src/ui/soil.ts as a pure function with no canvas in it, specifically so the constraint can be asserted in the self test instead of eyeballed. The renderer only blits the result.
+- Fix: First attempt measured the ground by sampling a canvas region and reported a mean of 0.0137, over the ceiling, and a peak of 0.405. The sample had caught food piles and units rather than bare ground: a peak that bright is a green food pile. Measuring the generator directly rather than the composited frame removed the ambiguity.
+- The grid keeps its job of conveying distance but at 4% white over soil it looked like a cutting mat, so it is now every 25 cells at 3.5% in a warm tone.
+
+**Tests**
+
+- Six checks on the ground rather than a visual judgement: mean luminance under 0.006, the texture is not flat, and every unit colour keeps 2.5:1 against both the mean and the 99th percentile of the texture. The tail matters as much as the average because a worker covers few enough pixels that a bright speck under it would hide it.
 
 ## 0.25.0 — Zoom and pan the map
 

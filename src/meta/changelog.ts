@@ -39,6 +39,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.26.0',
+    timestamp: '2026-08-21T22:50:36+07:00',
+    title: 'The ground looks like soil',
+    precision: 'commit',
+    changes: [
+      { area: 'ui', detail: 'The map was a flat #0d0b09 fill with a 4% white grid every 10 cells, which read as a technical canvas. It is now soil: per-pixel grain, a broad tonal wash and sparse grit, generated once per match from its seed and blitted rather than regenerated per frame, since draw() runs every frame and a rebuilt texture would crawl and cost frame rate at max speed.' },
+      { area: 'ui', detail: 'Generation lives in src/ui/soil.ts as a pure function with no canvas in it, specifically so the constraint can be asserted in the self test instead of eyeballed. The renderer only blits the result.' },
+      { area: 'tests', detail: 'Six checks on the ground rather than a visual judgement: mean luminance under 0.006, the texture is not flat, and every unit colour keeps 2.5:1 against both the mean and the 99th percentile of the texture. The tail matters as much as the average because a worker covers few enough pixels that a bright speck under it would hide it.' },
+      { area: 'ui', detail: 'First attempt measured the ground by sampling a canvas region and reported a mean of 0.0137, over the ceiling, and a peak of 0.405. The sample had caught food piles and units rather than bare ground: a peak that bright is a green food pile. Measuring the generator directly rather than the composited frame removed the ambiguity.', fix: true },
+      { area: 'ui', detail: 'The grid keeps its job of conveying distance but at 4% white over soil it looked like a cutting mat, so it is now every 25 cells at 3.5% in a warm tone.' },
+    ],
+  },
+  {
     version: '0.25.0',
     timestamp: '2026-08-21T22:43:53+07:00',
     title: 'Zoom and pan the map',

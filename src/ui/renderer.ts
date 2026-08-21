@@ -1,6 +1,7 @@
 import { MAP_HEIGHT, MAP_WIDTH, NEST_RADIUS, UNIT_STATS } from '../sim/config.js';
 import type { Simulation } from '../sim/sim.js';
 import type { ColonyId, Unit } from '../sim/types.js';
+import { generateSoil } from './soil.js';
 
 const COLONY_COLOURS: [string, string] = ['#f0a83c', '#45b8d8'];
 const COLONY_DIM: [string, string] = ['#7a5418', '#1d5c6e'];
@@ -37,6 +38,13 @@ export class Renderer {
   /** World coordinate at the top left of the view. */
   private panX = 0;
   private panY = 0;
+  /**
+   * Cached soil. A deliberate exception to this class being a pure projection:
+   * regenerating it per frame would make the ground crawl. Invalidated in
+   * resize(), since scale and device pixel ratio change there.
+   */
+  private soil: HTMLCanvasElement | null = null;
+  private soilSeed = 1;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -53,6 +61,31 @@ export class Renderer {
     this.canvas.height = Math.round(size * dpr);
     this.baseScale = (size * dpr) / MAP_WIDTH;
     this.applyZoom(this.zoom);
+    this.soil = null;
+  }
+
+  /**
+   * Build the soil once, at map resolution rather than screen resolution, so it
+   * scales with zoom instead of being regenerated. Deterministic from the match
+   * seed, so a replay looks the same as the original.
+   */
+  private buildSoil(): HTMLCanvasElement {
+    const size = Math.max(1, Math.round(MAP_WIDTH * this.baseScale));
+    const tile = document.createElement('canvas');
+    tile.width = size;
+    tile.height = size;
+    const tctx = tile.getContext('2d')!;
+    const image = tctx.createImageData(size, size);
+    image.data.set(generateSoil(size, this.soilSeed));
+    tctx.putImageData(image, 0, 0);
+    return tile;
+  }
+
+  /** Set by the viewer so the ground is stable per match. */
+  setSoilSeed(seed: number): void {
+    if (seed === this.soilSeed) return;
+    this.soilSeed = seed;
+    this.soil = null;
   }
 
   /** How many world cells fit across the view at the current zoom. */
@@ -132,10 +165,16 @@ export class Renderer {
     ctx.save();
     ctx.translate(-this.panX * this.scale, -this.panY * this.scale);
 
-    // Faint grid, one line every 10 cells, to give a sense of distance.
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    // Soil, blitted from the cached tile and stretched by the current zoom.
+    if (!this.soil) this.soil = this.buildSoil();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.soil, 0, 0, MAP_WIDTH * s, MAP_HEIGHT * s);
+
+    // The grid keeps its job of giving a sense of distance, but at 4% white over
+    // soil it read like a cutting mat, so it is now sparse and much fainter.
+    ctx.strokeStyle = 'rgba(200,180,140,0.035)';
     ctx.lineWidth = 1;
-    for (let i = 10; i < MAP_WIDTH; i += 10) {
+    for (let i = 25; i < MAP_WIDTH; i += 25) {
       ctx.beginPath();
       ctx.moveTo(i * s, 0);
       ctx.lineTo(i * s, MAP_HEIGHT * s);

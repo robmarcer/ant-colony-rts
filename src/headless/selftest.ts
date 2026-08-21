@@ -8,6 +8,16 @@ import { DEFAULT_STRATEGY, EXPANSION_PRIORITIES, PRESETS, SOLDIER_POSTURES } fro
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../match/runner.js';
 import { runMirror, winRateInterval } from '../match/tournament.js';
 import { buildLadder } from '../match/ladder.js';
+import {
+  GROUND_LUMINANCE_CEILING,
+  GROUND_MIN_CONTRAST,
+  UNIT_COLOURS,
+  contrastRatio,
+  generateSoil,
+  groundLuminanceStats,
+  hexToRgb,
+  relativeLuminance,
+} from '../ui/soil.js';
 import type { MatchSummaryRow } from '../match/types.js';
 import { balanceFingerprint } from '../meta/fingerprint.js';
 import { readFileSync } from 'node:fs';
@@ -1064,6 +1074,50 @@ console.log('rule conditions');
   const before = new Simulation({ seed: 'compat', timeLimitSeconds: 600, definitions: [def('a', 'boom'), def('b', 'rush')] });
   before.run(6001);
   check('plain value conditions still work exactly as before', before.finished && before.colonies[0].lifetimeFoodGathered > 0);
+}
+
+console.log('the ground stays dark enough to see things on');
+{
+  // The constraint that matters is contrast, not looks. Asserted rather than
+  // eyeballed, because everything on screen is small and two unit colours are
+  // dim: a 5px ant covers few enough pixels that the texture's bright tail
+  // matters as much as its average.
+  const soil = generateSoil(256, 12345);
+  const stats = groundLuminanceStats(soil);
+
+  check(
+    'the ground mean luminance is under the ceiling',
+    stats.mean <= GROUND_LUMINANCE_CEILING,
+    `${stats.mean.toFixed(5)} against a ceiling of ${GROUND_LUMINANCE_CEILING}`,
+  );
+  check('the ground is not flat', stats.peak > stats.mean * 1.5, `peak ${stats.peak.toFixed(5)} mean ${stats.mean.toFixed(5)}`);
+
+  const failures: string[] = [];
+  for (const [name, hex] of Object.entries(UNIT_COLOURS)) {
+    const [r, g, b] = hexToRgb(hex);
+    const against = contrastRatio(relativeLuminance(r, g, b), stats.mean);
+    if (against < GROUND_MIN_CONTRAST) failures.push(`${name} ${against.toFixed(2)}`);
+  }
+  check('every unit colour clears the contrast floor against the ground', failures.length === 0, failures.join(', '));
+
+  const tailFailures: string[] = [];
+  for (const [name, hex] of Object.entries(UNIT_COLOURS)) {
+    const [r, g, b] = hexToRgb(hex);
+    const against = contrastRatio(relativeLuminance(r, g, b), stats.p99);
+    if (against < GROUND_MIN_CONTRAST) tailFailures.push(`${name} ${against.toFixed(2)}`);
+  }
+  check(
+    'and against the bright tail of the texture, not just its average',
+    tailFailures.length === 0,
+    tailFailures.join(', '),
+  );
+
+  const again = groundLuminanceStats(generateSoil(256, 12345));
+  check('the ground is deterministic from its seed', again.mean === stats.mean);
+  check(
+    'and a different seed gives different ground',
+    groundLuminanceStats(generateSoil(256, 999)).peak !== stats.peak,
+  );
 }
 
 console.log('the ladder');
