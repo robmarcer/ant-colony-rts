@@ -1,5 +1,10 @@
 import { Rng } from './rng.js';
 import {
+  OBSTACLE_GAP,
+  OBSTACLE_MAX_RADIUS,
+  OBSTACLE_MIN_RADIUS,
+  OBSTACLE_NEST_CLEARANCE,
+  OBSTACLE_PAIRS,
   FOOD_TYPES,
   FOOD_TYPE_STATS,
   FOOD_CLUSTER_MAX,
@@ -10,7 +15,7 @@ import {
   STARTER_FOOD_AMOUNT,
   STARTER_FOOD_DISTANCE,
 } from './config.js';
-import type { FoodSource, Vec } from './types.js';
+import type { FoodSource, Obstacle, Vec } from './types.js';
 
 /** Where each colony's founding queen starts, point mirrored about the centre. */
 export const HOME_NEST_POSITIONS: [Vec, Vec] = [
@@ -28,11 +33,57 @@ function dist(a: Vec, b: Vec): number {
 }
 
 /**
+ * Generate rocks, in mirrored pairs like the food, so both colonies face
+ * identical terrain.
+ *
+ * Rocks never touch and always leave a gap wider than an ant can walk through,
+ * which is what guarantees no enclosed pockets and therefore no unreachable
+ * ground. Nests get extra clearance so a colony is never born hemmed in.
+ */
+export function generateObstacles(rng: Rng, nextId: () => number): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+  let placed = 0;
+  let attempts = 0;
+
+  while (placed < OBSTACLE_PAIRS && attempts < 20000) {
+    attempts++;
+    const radius = rng.range(OBSTACLE_MIN_RADIUS, OBSTACLE_MAX_RADIUS);
+    const p: Vec = {
+      x: rng.range(radius + 4, MAP_WIDTH - radius - 4),
+      y: rng.range(radius + 4, MAP_HEIGHT - radius - 4),
+    };
+    // One side of the anti-diagonal, so a rock never lands on its own mirror.
+    if (p.x + p.y > MAP_WIDTH - 10) continue;
+    const m = mirror(p);
+
+    const clearOfNests = HOME_NEST_POSITIONS.every(
+      (nest) =>
+        dist(p, nest) > radius + OBSTACLE_NEST_CLEARANCE && dist(m, nest) > radius + OBSTACLE_NEST_CLEARANCE,
+    );
+    if (!clearOfNests) continue;
+
+    const clearOfRocks = obstacles.every(
+      (other) =>
+        dist(p, other) > radius + other.radius + OBSTACLE_GAP &&
+        dist(m, other) > radius + other.radius + OBSTACLE_GAP,
+    );
+    if (!clearOfRocks) continue;
+    if (dist(p, m) < radius * 2 + OBSTACLE_GAP) continue;
+
+    obstacles.push({ id: nextId(), x: p.x, y: p.y, radius });
+    obstacles.push({ id: nextId(), x: m.x, y: m.y, radius });
+    placed++;
+  }
+
+  return obstacles;
+}
+
+/**
  * Generate food. Every source is created as a mirrored pair, so the two
  * colonies face an identical problem and any difference in outcome is down to
  * the strategies rather than the map. This matters for model comparison.
  */
-export function generateFood(rng: Rng, nextId: () => number): FoodSource[] {
+export function generateFood(rng: Rng, nextId: () => number, obstacles: Obstacle[] = []): FoodSource[] {
   const sources: FoodSource[] = [];
 
   const push = (p: Vec, amount: number, type: (typeof FOOD_TYPES)[number]) => {
@@ -90,6 +141,8 @@ export function generateFood(rng: Rng, nextId: () => number): FoodSource[] {
     const m = mirror(p);
     if (HOME_NEST_POSITIONS.some((n) => dist(p, n) < minFromNest || dist(m, n) < minFromNest)) continue;
     if (sources.some((s) => dist(p, s) < minSeparation || dist(m, s) < minSeparation)) continue;
+    // Food inside a rock could never be collected.
+    if (obstacles.some((o) => dist(p, o) < o.radius + 3 || dist(m, o) < o.radius + 3)) continue;
 
     const amount = Math.round(rng.range(FOOD_CLUSTER_MIN, FOOD_CLUSTER_MAX));
     const type = pickType();

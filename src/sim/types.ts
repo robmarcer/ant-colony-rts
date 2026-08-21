@@ -69,6 +69,14 @@ export interface Unit {
   relocateTo: Vec | null;
 }
 
+/** A rock. Convex, static, and never touching another, so nothing can be trapped. */
+export interface Obstacle {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+}
+
 /**
  * A nest. A colony starts with one and can found more by producing new queens.
  * Nests are production sites and drop-off points; the food stockpile itself is

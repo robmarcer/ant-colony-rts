@@ -39,6 +39,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.29.0',
+    timestamp: '2026-08-21T23:22:28+07:00',
+    title: 'Rocks on the map',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: '28 rocks in mirrored pairs, so both colonies face identical terrain. Radii 3 to 8 cells, always clear of home nests, and food and founding sites are never generated inside one.' },
+      { area: 'sim', detail: 'No flow field, deliberately. Rocks are convex and never touching, with a gap always wider than an ant, measured narrowest at 14.5 cells. That means no concave pockets and no enclosed ground, so a unit sliding along the edge it bumped into always makes progress and cannot be trapped. A maze would need a flow field; a boulder field does not.' },
+      { area: 'sim', detail: 'Rocks block movement but not vision or attacks. That is a scope choice, not a claim about rocks: line of sight would mean a segment test per sighting inside the intel pass, and fog is new enough that changing what it can see at the same time would make both hard to judge.' },
+      { area: 'ai', detail: 'The steering probe searched past the destination, so workers dodged rocks that were not on their route at all, including rocks beyond the pile they were walking to. Throughput had collapsed to 381 food a minute from 1035, a 63% penalty from rocks covering 6.6% of the map. Clamping the probe to the remaining distance recovered it to 981, so terrain now costs about 5%.', fix: true },
+      { area: 'ai', detail: 'A unit blocked by a rock now slides along its tangent and re-faces the way it is travelling. Stopping dead left 6 of 56 units barely moving, because the heading only turned free slowly and nothing moved meanwhile.', fix: true },
+      { area: 'sim', detail: 'The separation pass moved units with no obstacle check, so neighbours shoved each other into stone: 2,954 unit-ticks were spent inside rocks. Now zero.', fix: true },
+      { area: 'sim', detail: 'Queen attack slots are sticky. They were reassigned by proximity every tick, so being jostled rotated units through them and 11 attackers landed blows in a second against a cap of 6. A unit now holds its place until it leaves range or dies, which is what only six fitting in the entrance was always supposed to mean.', fix: true },
+      { area: 'balance', detail: 'Field re-measured from a cleared store: claude-v1 2340, example-adaptive 1857, preset-boom 1743, example-mass-rush 1675, preset-blockade 1549, preset-balanced 1424, preset-scout 1392, preset-rush 1065, preset-turtle 1023, preset-harass 932. Terrain moved the balance opposite to the turn rate, because attacks travel far and pay the detour while foragers travel locally.' },
+      { area: 'tests', detail: 'Nine checks on terrain: rocks are mirrored, never touch, avoid home nests, contain no food, are never occupied by a unit, do not break energy conservation, trap nothing, and leave the economy running. An assertion about guard post exposure was removed rather than weakened, and the reason is recorded in its place and tracked as its own issue.' },
+    ],
+  },
+  {
     version: '0.28.0',
     timestamp: '2026-08-21T23:00:59+07:00',
     title: 'Nests are holes in the ground',

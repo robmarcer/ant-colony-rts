@@ -185,6 +185,24 @@ export class Renderer {
 
     if (options.showIntel) this.drawIntel(sim);
 
+    // Rocks, drawn under everything else so units and food read on top.
+    for (const rock of sim.obstacles) {
+      const gradient = ctx.createRadialGradient(
+        (rock.x - rock.radius * 0.3) * s,
+        (rock.y - rock.radius * 0.3) * s,
+        rock.radius * 0.2 * s,
+        rock.x * s,
+        rock.y * s,
+        rock.radius * s,
+      );
+      gradient.addColorStop(0, '#4a4238');
+      gradient.addColorStop(1, '#241f19');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(rock.x * s, rock.y * s, rock.radius * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Food and corpses. Under fog, only what the viewing colony has found.
     const visibleFood =
       options.fogView === -1

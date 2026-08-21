@@ -26,6 +26,7 @@ import {
   MIN_NEST_SEPARATION,
   NEST_RADIUS,
   TURN_RATE,
+  UNIT_RADIUS,
   TURN_SPEED_FLOOR,
   RELOCATE_DROP_DISTANCE,
   RELOCATE_MIN_DISTANCE,
@@ -144,7 +145,7 @@ function handleRecycling(sim: Simulation, unit: Unit): boolean {
     return false;
   }
   unit.state = 'recycling';
-  if (moveToward(unit, home, UNIT_STATS[unit.type].speed) || sim.atNest(unit)) {
+  if (moveToward(sim, unit, home, UNIT_STATS[unit.type].speed) || sim.atNest(unit)) {
     sim.recycleUnit(unit);
   }
   return true;
@@ -268,6 +269,8 @@ function chooseFoundingSite(sim: Simulation, colony: Colony, parent: Nest): Vec 
       y: clamp(known.y + (toParent.y / length) * 5, 2, MAP_HEIGHT - 2),
     };
     if (!farEnoughFromOwn(site) || !farEnoughFromEnemy(site)) continue;
+    // A nest inside a rock would be unreachable and unbuildable.
+    if (sim.blocked(site.x, site.y, NEST_RADIUS)) continue;
 
     const fromParent = Math.hypot(site.x - parent.x, site.y - parent.y);
     const dEnemy = enemyDistance(site);
@@ -311,7 +314,7 @@ function queenAi(sim: Simulation, unit: Unit): void {
     }
     unit.targetEnemyId = null;
     unit.state = 'founding';
-    if (moveToward(unit, unit.foundingSite, stats.speed)) sim.foundNest(unit);
+    if (moveToward(sim, unit, unit.foundingSite, stats.speed)) sim.foundNest(unit);
     return;
   }
 
@@ -340,7 +343,7 @@ function workerAi(sim: Simulation, unit: Unit): void {
   if (unit.hp < unit.maxHp * retreatThreshold(strategy) && !sim.atNest(unit)) {
     unit.state = 'retreating';
     unit.targetEnemyId = null;
-    if (moveToward(unit, home, stats.speed)) {
+    if (moveToward(sim, unit, home, stats.speed)) {
       if (unit.carrying > 0) sim.depositFood(unit);
       unit.state = 'idle';
     }
@@ -358,7 +361,7 @@ function workerAi(sim: Simulation, unit: Unit): void {
 
   // Ferrying a load to safer ground rather than banking it.
   if (unit.state === 'relocating' && unit.relocateTo) {
-    if (moveToward(unit, unit.relocateTo, stats.speed)) {
+    if (moveToward(sim, unit, unit.relocateTo, stats.speed)) {
       sim.dropAsPile(unit);
       unit.state = 'idle';
       unit.targetFoodId = null;
@@ -367,7 +370,7 @@ function workerAi(sim: Simulation, unit: Unit): void {
   }
 
   if (unit.state === 'returning') {
-    if (moveToward(unit, home, stats.speed) || sim.atNest(unit)) {
+    if (moveToward(sim, unit, home, stats.speed) || sim.atNest(unit)) {
       sim.depositFood(unit);
       unit.state = 'idle';
       unit.targetFoodId = null;
@@ -407,13 +410,13 @@ function workerAi(sim: Simulation, unit: Unit): void {
       }
     } else {
       unit.state = 'moving';
-      moveToward(unit, source, stats.speed);
+      moveToward(sim, unit, source, stats.speed);
     }
     return;
   }
 
   if (unit.state === 'scouting' && unit.moveTo) {
-    if (moveToward(unit, unit.moveTo, stats.speed)) {
+    if (moveToward(sim, unit, unit.moveTo, stats.speed)) {
       unit.moveTo = null;
       unit.state = 'idle';
     } else {
@@ -457,7 +460,7 @@ function chooseWorkerJob(sim: Simulation, unit: Unit, colony: Colony, strategy: 
   if (known.length === 0 || sim.rng.next() < scoutChance) {
     unit.state = 'scouting';
     unit.moveTo = scoutPoint(sim, colony, strategy);
-    moveToward(unit, unit.moveTo, UNIT_STATS.worker.speed);
+    moveToward(sim, unit, unit.moveTo, UNIT_STATS.worker.speed);
     return;
   }
 
@@ -609,7 +612,7 @@ function soldierAi(sim: Simulation, unit: Unit): void {
   if (anchor && unit.hp < unit.maxHp * retreatThreshold(strategy) && !sim.atNest(unit)) {
     unit.state = 'retreating';
     unit.targetEnemyId = null;
-    moveToward(unit, anchor, stats.speed);
+    moveToward(sim, unit, anchor, stats.speed);
     return;
   }
   if (unit.state === 'retreating') {
@@ -664,7 +667,7 @@ function soldierAi(sim: Simulation, unit: Unit): void {
     unit.targetEnemyId = null;
     unit.state = 'guarding';
     if (Math.hypot(post.x - unit.x, post.y - unit.y) > GUARD_HOLD_RADIUS) {
-      moveToward(unit, post, stats.speed);
+      moveToward(sim, unit, post, stats.speed);
     }
     return;
   }
@@ -676,7 +679,7 @@ function soldierAi(sim: Simulation, unit: Unit): void {
     const target = pushTarget(sim, unit, strategy);
     unit.state = 'moving';
     unit.targetEnemyId = null;
-    moveToward(unit, target, stats.speed);
+    moveToward(sim, unit, target, stats.speed);
     return;
   }
 
@@ -710,7 +713,7 @@ function soldierAi(sim: Simulation, unit: Unit): void {
       : { x: unit.x, y: unit.y };
   unit.targetEnemyId = null;
   unit.state = 'guarding';
-  moveToward(unit, station, stats.speed);
+  moveToward(sim, unit, station, stats.speed);
 }
 
 /** Nearest own nest, or a founding queen if she is closer and needs cover. */
@@ -883,7 +886,46 @@ function engage(sim: Simulation, unit: Unit, enemy: Unit): void {
   unit.state = 'fighting';
   if (unit.type === 'queen') return; // settled queens never move
   const d = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
-  if (d > stats.attackRange * 0.85) moveToward(unit, enemy, stats.speed);
+  if (d > stats.attackRange * 0.85) moveToward(sim, unit, enemy, stats.speed);
+}
+
+/**
+ * Adjust a desired bearing to get around a rock.
+ *
+ * Samples a fan of headings either side of where the unit wants to go and takes
+ * the closest one that is clear, which is sliding along the edge it bumped into.
+ * With convex rocks that always makes progress, so there is nothing to get stuck
+ * on and no flow field is needed. If every heading is blocked, which the
+ * generation gaps should prevent, it keeps the original bearing rather than
+ * freezing in place.
+ */
+function steerAround(
+  sim: Simulation,
+  unit: Unit,
+  wanted: number,
+  speed: number,
+  distance: number,
+): number {
+  const margin = UNIT_RADIUS[unit.type];
+  // Far enough ahead that the turn rate has time to act, but never past the
+  // destination. Probing beyond it had workers veering around rocks that were
+  // not on their way at all, which cost far more throughput than the rocks did.
+  const probe = Math.min(distance, Math.max(4, speed * DT * 20));
+  const ahead = (angle: number) => ({
+    x: unit.x + Math.cos(angle) * probe,
+    y: unit.y + Math.sin(angle) * probe,
+  });
+
+  if (!sim.blocked(ahead(wanted).x, ahead(wanted).y, margin)) return wanted;
+
+  for (let step = 1; step <= 12; step++) {
+    const offset = (step * Math.PI) / 24;
+    for (const candidate of [wanted + offset, wanted - offset]) {
+      const point = ahead(candidate);
+      if (!sim.blocked(point.x, point.y, margin)) return candidate;
+    }
+  }
+  return wanted;
 }
 
 /**
@@ -894,13 +936,13 @@ function engage(sim: Simulation, unit: Unit, enemy: Unit): void {
  * well it is aligned, so it slows into a turn. That scaling is what stops a unit
  * orbiting a target it cannot turn tightly enough to reach.
  */
-function moveToward(unit: Unit, target: Vec, speed: number): boolean {
+function moveToward(sim: Simulation, unit: Unit, target: Vec, speed: number): boolean {
   const dx = target.x - unit.x;
   const dy = target.y - unit.y;
   const d = Math.hypot(dx, dy);
   if (d <= ARRIVE_EPSILON) return true;
 
-  const wanted = Math.atan2(dy, dx);
+  const wanted = steerAround(sim, unit, Math.atan2(dy, dx), speed, d);
   // Shortest signed turn into (-pi, pi], so a unit never turns the long way.
   let delta = wanted - unit.heading;
   delta = Math.atan2(Math.sin(delta), Math.cos(delta));
@@ -912,8 +954,44 @@ function moveToward(unit: Unit, target: Vec, speed: number): boolean {
   // stopped, so it always makes some progress and cannot deadlock.
   const alignment = Math.max(TURN_SPEED_FLOOR, Math.cos(delta));
   const step = Math.min(speed * alignment * DT, d);
-  unit.x = clamp(unit.x + Math.cos(unit.heading) * step, 0, MAP_WIDTH);
-  unit.y = clamp(unit.y + Math.sin(unit.heading) * step, 0, MAP_HEIGHT);
+  const margin = UNIT_RADIUS[unit.type] * 0.5;
+  const nextX = clamp(unit.x + Math.cos(unit.heading) * step, 0, MAP_WIDTH);
+  const nextY = clamp(unit.y + Math.sin(unit.heading) * step, 0, MAP_HEIGHT);
+
+  if (!sim.blocked(nextX, nextY, margin)) {
+    unit.x = nextX;
+    unit.y = nextY;
+  } else {
+    // Touching a rock: slide along its surface rather than stopping. Stopping
+    // dead is what made workers crawl, since the heading only turns free slowly
+    // and nothing moved in the meantime. Sliding always makes progress around a
+    // convex rock.
+    const rock = sim.nearestObstacle(unit.x, unit.y);
+    if (rock) {
+      const nx = unit.x - rock.x;
+      const ny = unit.y - rock.y;
+      const length = Math.hypot(nx, ny) || 1;
+      const tangents = [
+        { x: -ny / length, y: nx / length },
+        { x: ny / length, y: -nx / length },
+      ];
+      const want = { x: Math.cos(unit.heading), y: Math.sin(unit.heading) };
+      // Whichever tangent points more like where the unit wants to go.
+      tangents.sort((a, b) => b.x * want.x + b.y * want.y - (a.x * want.x + a.y * want.y));
+      for (const tangent of tangents) {
+        const slideX = clamp(unit.x + tangent.x * step, 0, MAP_WIDTH);
+        const slideY = clamp(unit.y + tangent.y * step, 0, MAP_HEIGHT);
+        if (!sim.blocked(slideX, slideY, margin)) {
+          unit.x = slideX;
+          unit.y = slideY;
+          // Face the way it is actually travelling, so it comes off the rock
+          // pointing sensibly rather than still aimed into it.
+          unit.heading = Math.atan2(tangent.y, tangent.x);
+          break;
+        }
+      }
+    }
+  }
   return Math.hypot(target.x - unit.x, target.y - unit.y) <= ARRIVE_EPSILON;
 }
 

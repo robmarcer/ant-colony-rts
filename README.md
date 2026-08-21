@@ -187,7 +187,8 @@ how close to the enemy you will settle.
 
 ## World
 
-- 200x200 open grid, no obstacles and no pathfinding in v1.
+- 200x200 grid with 28 rocks in mirrored pairs, so both colonies face identical
+  terrain. Rocks block movement but not vision or attacks.
 - Home nests at (40,40) and (160,160). Food is generated in mirrored pairs about
   the map centre, so both colonies face an identical map and any difference in
   outcome comes from the strategies.
@@ -257,6 +258,28 @@ round robins, or the sweep will take most of an hour rather than a minute.
   not regenerate.
 - No fog of war. Unit positions are global; food still has to be discovered by
   walking within vision range. See "Deliberate simplifications" below.
+
+## Terrain, and why there is no flow field
+
+Rocks are generated convex and never touching, with a gap always wider than an
+ant can walk through: measured narrowest 14.5 cells. That is a deliberate
+constraint rather than an accident, and it is what makes local steering
+sufficient. With convex obstacles and no enclosed pockets, a unit that slides
+along the edge it bumped into always makes progress toward its goal, so there is
+nothing to be trapped by and no ground that can be cut off. A maze would need a
+flow field; a boulder field does not, and building one for terrain that cannot
+trap anything would be machinery with nothing to do.
+
+Terrain costs about 5% of throughput, 981 food a minute against 1035 on open
+ground, which is roughly proportionate to the 6.6% of the map the rocks cover.
+Getting there took fixing a look-ahead bug that was costing 63%: the steering
+probe searched past the destination, so workers were dodging rocks that were not
+on their route at all.
+
+It shifted the balance the opposite way to the turn rate. Attacks travel far and
+pay the detour, foragers travel locally and mostly do not: example-mass-rush fell
+from 1852 to 1675 and preset-rush from 1322 to 1065, while preset-boom rose from
+1615 to 1743 and example-adaptive from 1725 to 1857.
 
 ## Ants have to turn around
 

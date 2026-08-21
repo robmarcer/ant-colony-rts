@@ -30,7 +30,7 @@ import {
   UNIT_STATS,
   type FoodType,
 } from './config.js';
-import { HOME_NEST_POSITIONS, generateFood } from './world.js';
+import { HOME_NEST_POSITIONS, generateFood, generateObstacles } from './world.js';
 import { PRESETS, type StrategyConfig } from './strategy.js';
 import { RULE_EVAL_INTERVAL_SECONDS, parseDefinition, type BehaviourDefinition } from './definition.js';
 import { computeMetrics, describeStrategy, evaluateRules, type Metrics } from './rules.js';
@@ -42,6 +42,7 @@ import type {
   KnownEnemy,
   KnownNest,
   Nest,
+  Obstacle,
   MatchEvent,
   MatchEventType,
   MatchOutcome,
@@ -92,6 +93,8 @@ export class Simulation {
   tick = 0;
   units = new Map<number, Unit>();
   food = new Map<number, FoodSource>();
+  /** Static, convex and never touching, so no ground is unreachable. */
+  obstacles: Obstacle[] = [];
   colonies: [Colony, Colony];
   events: MatchEvent[] = [];
   outcome: MatchOutcome = { status: 'running' };
@@ -116,6 +119,8 @@ export class Simulation {
   private soldierRanks: [Map<number, number>, Map<number, number>] = [new Map(), new Map()];
   private soldierCounts: [number, number] = [0, 0];
   private intruders: [Unit[], Unit[]] = [[], []];
+  /** Who currently holds a place at each queen's entrance. Sticky across ticks. */
+  private queenSlots = new Map<number, Set<number>>();
   private idCounter = 1;
   private lastNestAlarmTick: [number, number] = [-9999, -9999];
   private lastStarveAlarmTick: [number, number] = [-9999, -9999];
@@ -138,7 +143,9 @@ export class Simulation {
 
     this.colonies = [this.makeColony(0, definitions[0]), this.makeColony(1, definitions[1])];
 
-    for (const source of generateFood(this.rng, () => this.nextId())) {
+    // Rocks first, so food is never generated inside one.
+    this.obstacles = generateObstacles(this.rng, () => this.nextId());
+    for (const source of generateFood(this.rng, () => this.nextId(), this.obstacles)) {
       this.food.set(source.id, source);
     }
 
@@ -243,6 +250,33 @@ export class Simulation {
     const queens = this.queensOf(colony);
     if (queens.length === 0) return 0;
     return Math.min(...queens.map((queen) => queen.hp / queen.maxHp));
+  }
+
+  /**
+   * True if a point is inside a rock, with a margin for the unit's own body.
+   * Linear over the rocks, of which there are a couple of dozen.
+   */
+  blocked(x: number, y: number, margin = 0): boolean {
+    for (const rock of this.obstacles) {
+      const dx = x - rock.x;
+      const dy = y - rock.y;
+      if (dx * dx + dy * dy < (rock.radius + margin) * (rock.radius + margin)) return true;
+    }
+    return false;
+  }
+
+  /** The rock a point is nearest to, for sliding along its surface. */
+  nearestObstacle(x: number, y: number): Obstacle | null {
+    let best: Obstacle | null = null;
+    let bestDist = Infinity;
+    for (const rock of this.obstacles) {
+      const d = Math.hypot(x - rock.x, y - rock.y) - rock.radius;
+      if (d < bestDist) {
+        bestDist = d;
+        best = rock;
+      }
+    }
+    return best;
   }
 
   /** Nearest nest belonging to a colony, or null while it has none. */
@@ -852,8 +886,13 @@ export class Simulation {
     for (const [unitId, { dx, dy }] of displacement) {
       const unit = this.units.get(unitId);
       if (!unit) continue;
-      unit.x = Math.min(MAP_WIDTH, Math.max(0, unit.x + dx));
-      unit.y = Math.min(MAP_HEIGHT, Math.max(0, unit.y + dy));
+      const x = Math.min(MAP_WIDTH, Math.max(0, unit.x + dx));
+      const y = Math.min(MAP_HEIGHT, Math.max(0, unit.y + dy));
+      // Being shoved by a neighbour must not push a unit into a rock, which is
+      // how they were ending up inside them despite movement checking.
+      if (this.blocked(x, y, UNIT_RADIUS[unit.type] * 0.5)) continue;
+      unit.x = x;
+      unit.y = y;
     }
   }
 
@@ -901,21 +940,41 @@ export class Simulation {
    * while the same units stay in contact.
    */
   private assignQueenAttackSlots(): Map<number, Set<number>> {
-    const slots = new Map<number, Set<number>>();
     for (const id of [0, 1] as ColonyId[]) {
       for (const queen of this.queensOf(id)) {
-        const contenders: Array<{ id: number; distance: number }> = [];
+        const inRange = new Map<number, number>();
         for (const enemy of this.near(id === 0 ? 1 : 0, queen, 4)) {
-          const range = UNIT_STATS[enemy.type].attackRange;
           const distance = Math.hypot(enemy.x - queen.x, enemy.y - queen.y);
-          if (distance <= range) contenders.push({ id: enemy.id, distance });
+          if (distance <= UNIT_STATS[enemy.type].attackRange) inRange.set(enemy.id, distance);
         }
-        if (contenders.length === 0) continue;
-        contenders.sort((a, b) => a.distance - b.distance || a.id - b.id);
-        slots.set(queen.id, new Set(contenders.slice(0, QUEEN_MAX_ATTACKERS).map((c) => c.id)));
+
+        // Slots are sticky: a unit holds its place at the entrance until it
+        // leaves range or dies. Reassigning by proximity every tick let far more
+        // than the cap land blows within a second, because being jostled by
+        // neighbours rotated units through the slots. That defeated the point,
+        // which is a hard ceiling on how fast a queen can be worn down.
+        const held = this.queenSlots.get(queen.id) ?? new Set<number>();
+        for (const holder of [...held]) if (!inRange.has(holder)) held.delete(holder);
+
+        if (held.size < QUEEN_MAX_ATTACKERS) {
+          const waiting = [...inRange.entries()]
+            .filter(([unitId]) => !held.has(unitId))
+            .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+          for (const [unitId] of waiting) {
+            if (held.size >= QUEEN_MAX_ATTACKERS) break;
+            held.add(unitId);
+          }
+        }
+        if (held.size > 0) this.queenSlots.set(queen.id, held);
+        else this.queenSlots.delete(queen.id);
       }
     }
-    return slots;
+
+    // Drop slots for queens that no longer exist.
+    for (const queenId of [...this.queenSlots.keys()]) {
+      if (!this.units.has(queenId)) this.queenSlots.delete(queenId);
+    }
+    return this.queenSlots;
   }
 
   private killUnit(unit: Unit, killer: ColonyId): void {

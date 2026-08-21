@@ -382,6 +382,29 @@ export const RELOCATE_MIN_DISTANCE = CONTEST_MAX_HAUL;
 /** Corpses are flesh: ordinary density, so a battlefield is worth a normal trip. */
 export const CORPSE_DENSITY = 1.0;
 
+/**
+ * Rocks.
+ *
+ * Deliberately convex and never touching. That is the whole reason this needs no
+ * flow field: with convex obstacles separated by a gap wider than an ant, a unit
+ * that slides along the edge it bumped into always makes progress toward its
+ * goal, and there are no concave pockets to be trapped in and no enclosed
+ * regions to be cut off from. A maze would need a flow field; a boulder field
+ * does not, and building one for terrain that cannot trap anything would be
+ * machinery with nothing to do.
+ *
+ * Obstacles block movement only. They do not block vision or attacks, which is a
+ * scope choice rather than a claim about rocks: line of sight would mean a
+ * segment test per sighting inside the intel pass, and fog is new enough that
+ * changing what it can see at the same time would make both hard to judge.
+ */
+export const OBSTACLE_PAIRS = 14;
+export const OBSTACLE_MIN_RADIUS = 3;
+export const OBSTACLE_MAX_RADIUS = 8;
+/** Gap left between two rocks, and between a rock and a nest, in cells. */
+export const OBSTACLE_GAP = 12;
+export const OBSTACLE_NEST_CLEARANCE = 18;
+
 /** Map generation. Scaled with the map area so food density stays comparable. */
 export const FOOD_CLUSTER_PAIRS = 30; // mirrored, so 60 sources plus starters
 export const FOOD_CLUSTER_MIN = 180;
