@@ -25,6 +25,8 @@ import {
   MIN_ENEMY_NEST_DISTANCE,
   MIN_NEST_SEPARATION,
   NEST_RADIUS,
+  TURN_RATE,
+  TURN_SPEED_FLOOR,
   RELOCATE_DROP_DISTANCE,
   RELOCATE_MIN_DISTANCE,
   RELOCATE_MIN_PILE,
@@ -884,16 +886,35 @@ function engage(sim: Simulation, unit: Unit, enemy: Unit): void {
   if (d > stats.attackRange * 0.85) moveToward(unit, enemy, stats.speed);
 }
 
-/** Straight line movement. Terrain is open in v1, so there is no pathfinding. */
+/**
+ * Turn toward the target, then travel along the heading actually held.
+ *
+ * Terrain is open, so there is still no pathfinding, but a unit can no longer
+ * reverse for free: it turns at a limited rate and its speed is scaled by how
+ * well it is aligned, so it slows into a turn. That scaling is what stops a unit
+ * orbiting a target it cannot turn tightly enough to reach.
+ */
 function moveToward(unit: Unit, target: Vec, speed: number): boolean {
   const dx = target.x - unit.x;
   const dy = target.y - unit.y;
   const d = Math.hypot(dx, dy);
   if (d <= ARRIVE_EPSILON) return true;
-  const step = Math.min(speed * DT, d);
-  unit.x = clamp(unit.x + (dx / d) * step, 0, MAP_WIDTH);
-  unit.y = clamp(unit.y + (dy / d) * step, 0, MAP_HEIGHT);
-  return false;
+
+  const wanted = Math.atan2(dy, dx);
+  // Shortest signed turn into (-pi, pi], so a unit never turns the long way.
+  let delta = wanted - unit.heading;
+  delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+  const maxTurn = TURN_RATE[unit.type] * DT;
+  unit.heading += Math.abs(delta) <= maxTurn ? delta : Math.sign(delta) * maxTurn;
+  unit.heading = Math.atan2(Math.sin(unit.heading), Math.cos(unit.heading));
+
+  // Aligned units move at full speed; a unit mid-turn is slowed but never
+  // stopped, so it always makes some progress and cannot deadlock.
+  const alignment = Math.max(TURN_SPEED_FLOOR, Math.cos(delta));
+  const step = Math.min(speed * alignment * DT, d);
+  unit.x = clamp(unit.x + Math.cos(unit.heading) * step, 0, MAP_WIDTH);
+  unit.y = clamp(unit.y + Math.sin(unit.heading) * step, 0, MAP_HEIGHT);
+  return Math.hypot(target.x - unit.x, target.y - unit.y) <= ARRIVE_EPSILON;
 }
 
 function clamp(n: number, min: number, max: number): number {

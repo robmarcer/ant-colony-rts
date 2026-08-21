@@ -258,6 +258,22 @@ round robins, or the sweep will take most of an hour rather than a minute.
 - No fog of war. Unit positions are global; food still has to be discovered by
   walking within vision range. See "Deliberate simplifications" below.
 
+## Ants have to turn around
+
+Units hold a heading and turn toward where they want to go at a limited rate,
+travelling along the heading they actually have rather than straight at the
+target. Speed scales with alignment, so a unit slows into a turn, which is what
+stops one orbiting a target it cannot turn tightly enough to reach: measured at 0
+of 59 units orbiting.
+
+A worker takes 0.70 seconds to reverse, a soldier 1.21, a founding queen 3.93.
+
+This was expected to weaken committed attacks, since a soldier reacting to a new
+attacker pays for the swing. It did the opposite: example-mass-rush rose from 1724
+to 1852 while preset-boom fell from 1691 to 1615. A massed ball travelling in one
+direction barely turns, whereas foragers and defenders re-target constantly and
+pay the cost every time. Turning taxes reactive play more than committed play.
+
 ## The ground
 
 Soil rather than a flat fill: grain, a broad tonal wash, and sparse grit,

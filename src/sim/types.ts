@@ -39,6 +39,8 @@ export interface Unit {
   moveTo: Vec | null;
   /** Seconds until this unit can attack again. */
   attackCooldown: number;
+  /** Direction this unit faces, radians. Movement follows it, not the target. */
+  heading: number;
   bornTick: number;
   /** Tick this unit last took damage, used to decide if a worker fights back. */
   lastDamagedTick: number;

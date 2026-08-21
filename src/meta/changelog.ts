@@ -39,6 +39,31 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.28.0',
+    timestamp: '2026-08-21T23:00:59+07:00',
+    title: 'Nests are holes in the ground',
+    precision: 'commit',
+    changes: [
+      { area: 'ui', detail: 'A nest was a translucent circle with a coloured ring, which read as a zone rather than a place. It is now an entrance in the earth: a dark mouth with a raised spoil rim spread wider than the hole.' },
+      { area: 'ui', detail: 'The near lip is drawn again after the units, so an ant at the mouth is half occluded rather than standing on top of a dark circle. That asymmetry between the near and far side is what sells descending. A thin full ring is kept at low alpha so a nest is still findable at the whole-map view, where the arc alone is a couple of pixels.' },
+      { area: 'ui', detail: 'The queen stays drawn at the centre and legible, since she is the win condition and her health has to be readable. Renderer only, so no balance fingerprint change and no stored matches invalidated.' },
+    ],
+  },
+  {
+    version: '0.27.0',
+    timestamp: '2026-08-21T23:00:59+07:00',
+    title: 'Ants have a heading and have to turn around',
+    precision: 'commit',
+    changes: [
+      { area: 'sim', detail: 'Units hold a heading, turn toward the bearing they want at a limited rate, and travel along the heading they actually have. Movement used to step straight at the target, so a unit could reverse between two ticks for free. A worker now takes 0.70s to reverse, a soldier 1.21s, a founding queen 3.93s.' },
+      { area: 'sim', detail: 'Speed scales with how well a unit is aligned with where it wants to go, so it slows into a turn rather than orbiting a target it cannot turn tightly enough to reach. That is the classic failure of adding a turn rate and it does not occur: measured 0 of 59 active units barely moving.' },
+      { area: 'balance', detail: 'This was expected to weaken committed attacks, because a soldier reacting to a new attacker pays for the swing. It did the opposite. example-mass-rush rose from 1724 to 1852 and is now second, while preset-boom fell from 1691 to 1615. A massed ball travelling in one direction barely turns, whereas foragers and defenders re-target constantly and pay every time, so turning taxes reactive play more than committed play.' },
+      { area: 'balance', detail: 'Food throughput was unaffected, 1035 a minute against about 1000 before, so the cost lands on manoeuvring rather than on hauling.' },
+      { area: 'ui', detail: 'Ants are drawn as segmented bodies along their heading: abdomen at the back, head at the front. A soldier gains a mandible wedge, so the triangle that always pointed north now points where it is going, and a worker carries its load out in front. At the whole-map view this is a few pixels and reads as a dot, which is what the zoom added in the previous release is for.' },
+      { area: 'tests', detail: 'A fog assertion that required a non-scouting colony to believe exactly zero enemies became brittle, because changed paths mean a forager occasionally stumbles across a stray. It now asserts nearly blind, at most 10% of the truth, which is the property that actually matters.', fix: true },
+    ],
+  },
+  {
     version: '0.26.0',
     timestamp: '2026-08-21T22:50:36+07:00',
     title: 'The ground looks like soil',

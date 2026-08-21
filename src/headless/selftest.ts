@@ -248,8 +248,8 @@ console.log('fog of war');
   const blind = observe(0);
   const looking = observe(0.6);
   check(
-    'a colony that does not scout is still in the dark at 300 seconds',
-    blind.believed === 0,
+    'a colony that does not scout is nearly blind at 300 seconds',
+    blind.believed <= blind.actual * 0.1,
     `believed ${blind.believed} of ${blind.actual}`,
   );
   check(

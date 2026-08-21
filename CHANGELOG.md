@@ -1,10 +1,42 @@
 # Changelog
 
-Current version: **0.26.0**. 26 releases, 177 recorded changes.
+Current version: **0.28.0**. 28 releases, 186 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.28.0 — Nests are holes in the ground
+
+2026-08-21 23:00 (UTC+07:00) · committed · 3 changes
+
+**Viewer**
+
+- A nest was a translucent circle with a coloured ring, which read as a zone rather than a place. It is now an entrance in the earth: a dark mouth with a raised spoil rim spread wider than the hole.
+- The near lip is drawn again after the units, so an ant at the mouth is half occluded rather than standing on top of a dark circle. That asymmetry between the near and far side is what sells descending. A thin full ring is kept at low alpha so a nest is still findable at the whole-map view, where the arc alone is a couple of pixels.
+- The queen stays drawn at the centre and legible, since she is the win condition and her health has to be readable. Renderer only, so no balance fingerprint change and no stored matches invalidated.
+
+## 0.27.0 — Ants have a heading and have to turn around
+
+2026-08-21 23:00 (UTC+07:00) · committed · 6 changes
+
+**Simulation**
+
+- Units hold a heading, turn toward the bearing they want at a limited rate, and travel along the heading they actually have. Movement used to step straight at the target, so a unit could reverse between two ticks for free. A worker now takes 0.70s to reverse, a soldier 1.21s, a founding queen 3.93s.
+- Speed scales with how well a unit is aligned with where it wants to go, so it slows into a turn rather than orbiting a target it cannot turn tightly enough to reach. That is the classic failure of adding a turn rate and it does not occur: measured 0 of 59 active units barely moving.
+
+**Balance**
+
+- This was expected to weaken committed attacks, because a soldier reacting to a new attacker pays for the swing. It did the opposite. example-mass-rush rose from 1724 to 1852 and is now second, while preset-boom fell from 1691 to 1615. A massed ball travelling in one direction barely turns, whereas foragers and defenders re-target constantly and pay every time, so turning taxes reactive play more than committed play.
+- Food throughput was unaffected, 1035 a minute against about 1000 before, so the cost lands on manoeuvring rather than on hauling.
+
+**Viewer**
+
+- Ants are drawn as segmented bodies along their heading: abdomen at the back, head at the front. A soldier gains a mandible wedge, so the triangle that always pointed north now points where it is going, and a worker carries its load out in front. At the whole-map view this is a few pixels and reads as a dot, which is what the zoom added in the previous release is for.
+
+**Tests**
+
+- Fix: A fog assertion that required a non-scouting colony to believe exactly zero enemies became brittle, because changed paths mean a forager occasionally stumbles across a stray. It now asserts nearly blind, at most 10% of the truth, which is the property that actually matters.
 
 ## 0.26.0 — The ground looks like soil
 

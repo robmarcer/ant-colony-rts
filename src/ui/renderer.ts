@@ -210,21 +210,19 @@ export class Renderer {
       }
     }
 
-    // Nests. A colony can have several once it has produced more queens.
+    // Nests, drawn as holes in the earth: a dark mouth with a raised spoil rim.
+    // Units are drawn after this, so an ant standing at the centre paints over
+    // the hole; the rim is then drawn again on top at the end, which is what
+    // makes an ant at the mouth read as descending into it.
+    const nestsToDraw: Array<{ x: number; y: number; owner: ColonyId }> = [];
     for (const colony of sim.colonies) {
-      // Under fog, their nests are only the ones the viewer knows about.
       const nests =
         options.fogView === -1 || colony.id === options.fogView
           ? colony.nests
-          : sim.believedEnemyNests(options.fogView).map((known) => ({ ...known, x: known.x, y: known.y }));
-      ctx.strokeStyle = COLONY_COLOURS[colony.id];
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
-      ctx.lineWidth = Math.max(1, s * 0.25);
+          : sim.believedEnemyNests(options.fogView).map((known) => ({ x: known.x, y: known.y }));
       for (const nest of nests) {
-        ctx.beginPath();
-        ctx.arc(nest.x * s, nest.y * s, NEST_RADIUS * s, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        nestsToDraw.push({ x: nest.x, y: nest.y, owner: colony.id });
+        this.drawNestHole(nest.x, nest.y, colony.id);
       }
     }
 
@@ -257,6 +255,9 @@ export class Renderer {
         this.drawGhost(belief.x, belief.y, belief.type, viewer === 0 ? 1 : 0, age);
       }
     }
+
+    // The rim again, over the units, so an ant at the mouth is half swallowed.
+    for (const nest of nestsToDraw) this.drawNestRim(nest.x, nest.y, nest.owner);
 
     ctx.restore();
   }
@@ -308,55 +309,129 @@ export class Renderer {
     }
   }
 
+  /**
+   * An ant, pointing where it is going.
+   *
+   * Three segments along the heading, abdomen at the back and head at the front,
+   * because a body with a front and a back is what makes a direction readable.
+   * At the whole-map view this is a few pixels and reads as a dot, which is fine;
+   * it is drawn for the zoomed view, where a worker is about 42px.
+   */
   private drawUnit(unit: Unit): void {
     const { ctx } = this;
     const s = this.scale;
-    const x = unit.x * s;
-    const y = unit.y * s;
     const health = unit.hp / unit.maxHp;
     const colour = health > 0.45 ? COLONY_COLOURS[unit.owner] : COLONY_DIM[unit.owner];
+
+    ctx.save();
+    ctx.translate(unit.x * s, unit.y * s);
+    ctx.rotate(unit.heading);
     ctx.fillStyle = colour;
 
     if (unit.type === 'queen') {
-      const r = s * 2.4;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
-        const px = x + Math.cos(angle) * r;
-        const py = y + Math.sin(angle) * r;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
-      // A founding queen gets a pale outline so she reads as in transit.
+      // Long abdomen, which is what makes a queen a queen.
+      this.segment(2.6 * s, 0, 1.5 * s);
+      this.segment(0.2 * s, 0, 1.0 * s);
+      this.segment(-1.3 * s, 0, 0.85 * s);
       ctx.strokeStyle = unit.foundingSite === null ? '#12100e' : '#eee6d8';
-      ctx.lineWidth = Math.max(1, s * 0.25);
+      ctx.lineWidth = Math.max(1, s * 0.18);
+      ctx.beginPath();
+      ctx.arc(2.6 * s, 0, 1.5 * s, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
       return;
     }
 
     if (unit.type === 'soldier') {
-      const r = s * 1.25;
+      this.segment(0.85 * s, 0, 0.62 * s);
+      this.segment(-0.15 * s, 0, 0.5 * s);
+      // Mandibles: a wedge at the front, so a soldier reads as armed and the
+      // triangle finally points where it is actually going.
       ctx.beginPath();
-      ctx.moveTo(x, y - r);
-      ctx.lineTo(x + r * 0.9, y + r * 0.8);
-      ctx.lineTo(x - r * 0.9, y + r * 0.8);
+      ctx.moveTo(-1.5 * s, 0);
+      ctx.lineTo(-0.3 * s, 0.62 * s);
+      ctx.lineTo(-0.3 * s, -0.62 * s);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
       return;
     }
 
-    const r = s * 0.72;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    // A loaded worker gets a green pip, so hauling is visible at a glance.
+    // Worker.
+    this.segment(0.62 * s, 0, 0.42 * s);
+    this.segment(-0.05 * s, 0, 0.32 * s);
+    this.segment(-0.6 * s, 0, 0.26 * s);
     if (unit.carrying > 0) {
+      // The load, carried out front where an ant would hold it.
       ctx.fillStyle = '#6fbf5a';
       ctx.beginPath();
-      ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
+      ctx.arc(1.15 * s, 0, 0.3 * s, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
+  }
+
+  /**
+   * The mouth of a nest: a dark hole with a spoil rim in the colony's colour.
+   * Drawn before units so they paint over it, then the rim is repeated on top.
+   */
+  private drawNestHole(x: number, y: number, owner: ColonyId): void {
+    const { ctx } = this;
+    const s = this.scale;
+    const r = NEST_RADIUS * s;
+
+    // Spoil heap: slightly lighter than soil, spread wider than the mouth.
+    const spoil = ctx.createRadialGradient(x * s, y * s, r * 0.7, x * s, y * s, r * 1.5);
+    spoil.addColorStop(0, 'rgba(64, 52, 38, 0.85)');
+    spoil.addColorStop(1, 'rgba(64, 52, 38, 0)');
+    ctx.fillStyle = spoil;
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // The hole itself, darker than any ground so it reads as depth.
+    const mouth = ctx.createRadialGradient(x * s, y * s, 0, x * s, y * s, r);
+    mouth.addColorStop(0, '#000000');
+    mouth.addColorStop(0.75, '#05040300');
+    mouth.addColorStop(0.75, 'rgba(6, 5, 4, 0.95)');
+    mouth.addColorStop(1, 'rgba(20, 16, 12, 0.4)');
+    ctx.fillStyle = mouth;
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /**
+   * The near lip of the mouth, drawn after units. Only the lower arc, so an ant
+   * on the far side is occluded and one on the near side is not: that asymmetry
+   * is what sells descending rather than standing on a dark circle.
+   */
+  private drawNestRim(x: number, y: number, owner: ColonyId): void {
+    const { ctx } = this;
+    const s = this.scale;
+    const r = NEST_RADIUS * s;
+    ctx.strokeStyle = COLONY_COLOURS[owner];
+    ctx.lineWidth = Math.max(1, s * 0.35);
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r, 0, Math.PI, false);
+    ctx.stroke();
+
+    // A thin full ring so the nest is still findable at the whole-map view,
+    // where the arc alone is only a couple of pixels.
+    ctx.lineWidth = Math.max(1, s * 0.12);
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /** One body segment, in the unit's local rotated frame. */
+  private segment(x: number, y: number, radius: number): void {
+    const { ctx } = this;
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(0.6, radius), 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 

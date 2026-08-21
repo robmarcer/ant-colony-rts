@@ -195,6 +195,30 @@ export const NEST_REGEN_PER_SECOND = 0.03;
  * in place, the result would depend on the order units happened to be iterated,
  * and determinism is the property this whole project rests on.
  */
+/**
+ * Ants have to turn around.
+ *
+ * Movement used to step straight at a target, so a unit could reverse direction
+ * between two ticks for free. Now it turns toward the bearing it wants at a
+ * limited rate and travels along the heading it actually has, which costs tempo:
+ * a target behind you takes time to face, journeys are slightly longer than the
+ * straight line, and a soldier reacting to a new attacker pays for the swing.
+ *
+ * Radians per second. A worker turns quickly, a soldier is more committed, and a
+ * founding queen is ponderous.
+ */
+export const TURN_RATE: Record<UnitType, number> = {
+  queen: 0.8,
+  worker: 4.5,
+  soldier: 2.6,
+};
+/**
+ * Speed is scaled by how well a unit is aligned with where it wants to go, so it
+ * slows into a turn. Without this a unit that cannot turn tightly enough orbits
+ * a nearby target forever, which is the classic failure of a turn rate.
+ */
+export const TURN_SPEED_FLOOR = 0.35;
+
 export const UNIT_RADIUS: Record<UnitType, number> = {
   queen: 1.6,
   worker: 0.45,
