@@ -40,6 +40,13 @@ import {
 import { APP_VERSION, CHANGELOG, totalChanges } from '../src/meta/changelog.js';
 import { NotReplayable, isReplayable, replayRecord, runMatch } from '../src/match/runner.js';
 import { balanceFingerprint } from '../src/meta/fingerprint.js';
+import {
+  CHECK_CACHE_SECONDS,
+  RELEASE_REPO,
+  applyUpdate,
+  checkForUpdate,
+  manualInstructions,
+} from '../src/meta/update.js';
 import { runRoundRobin, runSeries } from '../src/match/tournament.js';
 import { buildLadder } from '../src/match/ladder.js';
 import {
@@ -76,6 +83,17 @@ function handler(fn: (req: Request, res: Response) => void) {
   };
 }
 
+/**
+ * The same for a handler that awaits. Separate from `handler` on purpose: passing
+ * an async function to that one type checks cleanly and then swallows every
+ * rejection, because the returned promise is dropped rather than returned.
+ */
+function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch(next);
+  };
+}
+
 // ------------------------------------------------------------------- discovery
 
 app.get('/api', (_req, res) => {
@@ -105,6 +123,8 @@ app.get('/api', (_req, res) => {
       'GET /api/stats/:id': 'aggregate win/loss record for one definition across saved matches',
       'GET /api/ladder': 'ratings across every definition, from every comparable stored match',
       'POST /api/ladder/sweep': 'play a round robin, save it, and return the updated ladder',
+      'GET /api/update': 'is a newer release published: current against latest, how this copy was installed, and what applying one would risk',
+      'POST /api/update': 'apply an update, loopback only: {acknowledge: [warning ids], matchRunning?}',
     },
   });
 });
@@ -130,6 +150,107 @@ app.get('/api/changelog', (_req, res) => {
     entries: CHANGELOG,
   });
 });
+
+/*
+ * ---------------------------------------------------------------- updates
+ *
+ * Issue #19. The check is server side so the unauthenticated GitHub rate limit is
+ * spent once per process rather than once per open tab, and so the browser makes
+ * no cross-origin calls.
+ */
+
+/** How many stored matches the running build can still rank, for the update warning. */
+function comparableMatchCount(): number {
+  const hash = balanceFingerprint();
+  return listMatches({ limit: 100000 }).filter((row) => row.balanceHash === hash).length;
+}
+
+/**
+ * Refuse anything that applies an update unless it came from this machine.
+ *
+ * The route runs git and npm, so on an exposed port it is remote code execution.
+ * The whole app is designed to be local, but "designed to be" is not a control,
+ * and someone will eventually put it behind a tunnel to show a colleague.
+ */
+function fromLoopback(req: Request): boolean {
+  const address = req.socket.remoteAddress ?? '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+app.get('/api/update', asyncHandler(async (req: Request, res: Response) => {
+  const status = await checkForUpdate(
+    { matchRunning: req.query.matchRunning === 'true', storedMatches: comparableMatchCount() },
+    { force: req.query.force === 'true' },
+  );
+  res.json({
+    ...status,
+    repo: RELEASE_REPO,
+    cacheSeconds: CHECK_CACHE_SECONDS,
+    note:
+      status.standing === 'ahead'
+        ? 'This build is newer than the newest published release, which is normal while a version is being worked on.'
+        : status.latest === null
+          ? 'No releases are published for this repository yet, so there is nothing to compare against.'
+          : undefined,
+  });
+}));
+
+/**
+ * Apply an update. Opt in twice: the caller has to ask, and has to acknowledge
+ * each warning by id. Acknowledging by id rather than with one flag means a
+ * warning added later cannot be waved through by an old client that never showed
+ * it to anybody.
+ */
+app.post('/api/update', asyncHandler(async (req: Request, res: Response) => {
+  if (!fromLoopback(req)) {
+    res.status(403).json({
+      error: 'updates can only be applied from the machine running the server, because applying one runs git and npm',
+    });
+    return;
+  }
+
+  const body = (req.body ?? {}) as { acknowledge?: string[]; matchRunning?: boolean };
+  const status = await checkForUpdate(
+    { matchRunning: body.matchRunning === true, storedMatches: comparableMatchCount() },
+    { force: true },
+  );
+
+  if (status.release === null || status.standing !== 'behind') {
+    res.status(409).json({
+      error:
+        status.latest === null
+          ? 'there is no published release to update to'
+          : `nothing to apply: this build is ${status.standing} at ${status.current} against ${status.latest}`,
+      status,
+    });
+    return;
+  }
+
+  const acknowledged = new Set(body.acknowledge ?? []);
+  const unacknowledged = status.warnings.filter((warning) => !acknowledged.has(warning.id));
+  if (unacknowledged.length > 0) {
+    res.status(409).json({
+      error: 'these have to be acknowledged before an update is applied',
+      acknowledge: unacknowledged.map((warning) => warning.id),
+      warnings: unacknowledged,
+      status,
+    });
+    return;
+  }
+
+  if (!status.install.updatable) {
+    // 501 rather than 400: the request is fine, this install just cannot be
+    // updated by the server, and the body says how to do it by hand.
+    res.status(501).json({
+      error: `this install cannot be updated in place (${status.install.reason})`,
+      install: status.install,
+      instructions: manualInstructions(status.install.kind, status.release.tag),
+    });
+    return;
+  }
+
+  res.json(applyUpdate(status.release, status.install));
+}));
 
 /**
  * The agent brief, served so an LLM given nothing but this base URL can bootstrap

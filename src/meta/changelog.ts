@@ -39,6 +39,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.31.0',
+    timestamp: '2026-08-22T18:57:58+07:00',
+    title: 'The app knows when it is out of date',
+    precision: 'commit',
+    changes: [
+      { area: 'api', detail: 'GET /api/update reports the running version against the newest published release, how this copy was installed, and what applying an update would risk. Issue #19. The check is server side and cached for 15 minutes, so the unauthenticated GitHub limit of 60 an hour is spent once per process rather than once per open tab; a few tabs polling directly would have exhausted it.' },
+      { area: 'api', detail: 'POST /api/update applies one, and refuses in four distinct ways rather than half-applying: nothing published to update to, this build is not behind, a warning has not been acknowledged, or this install cannot be updated in place. A failed step stops the sequence and says how to recover, so a failure leaves a checkout that is behind rather than one that is half moved.' },
+      { area: 'api', detail: 'POST /api/update accepts loopback connections only. Applying an update runs git and npm, so on an exposed port it is remote code execution. The app is meant to be local, but that is an intention rather than a control, and someone will eventually put it behind a tunnel to show a colleague. Verified by calling it over the machine\'s LAN address and getting 403 while the read-only check still answered 200.' },
+      { area: 'api', detail: 'Warnings are acknowledged by id, not by one blanket flag, so a warning added in a later version cannot be waved through by an older client that never displayed it.' },
+      { area: 'ui', detail: 'A header badge naming the new version, which stays hidden unless there is something to say. Up to date, ahead of the newest release, and unable to reach GitHub are all silent: a badge that reports good news as well as bad is a badge nobody reads, and then the once it matters it is invisible. Clicking it opens a panel stating what changed and both risks before it offers the button.' },
+      { area: 'ui', detail: 'The browser passes whether a match is running, because only it knows. The server cannot see what is on screen, and updating throws away an unsaved simulation.' },
+      { area: 'tooling', detail: 'npm run releases publishes a GitHub release per version tag with notes generated from the changelog. It is a dry run by default and needs --publish to create anything, because publishing is public and not quietly undoable. It cuts oldest first, so the releases API points /latest at the newest version rather than at whichever was created last.' },
+      { area: 'tooling', detail: 'Release notes and CHANGELOG.md now render from one shared module. Notes written separately would drift from the changelog the app serves for the same version, and then the update prompt and the release page would disagree about what changed. The refactor was checked by regenerating CHANGELOG.md and diffing it byte for byte.' },
+      { area: 'api', detail: 'An async-aware route wrapper. Passing an async function to the existing one type checked cleanly and then dropped every rejection, so a failed update check would have surfaced as an unhandled rejection instead of a JSON error.', fix: true },
+      { area: 'docs', detail: 'The README documented the ladder as pooling matches by balance numbers alone. It has hashed the simulation source since 0.30.0.', fix: true },
+      { area: 'tests', detail: 'Forty-one checks over version arithmetic, the standing states, the warnings, the update plans and the badge. Numeric rather than text comparison is pinned explicitly, because string ordering puts 0.9.0 after 0.10.0. Not covered: the apply path\'s stop-on-failure behaviour end to end, which needs a real failing checkout to run and was not exercised.' },
+    ],
+  },
+  {
     version: '0.30.0',
     timestamp: '2026-08-22T11:47:26+07:00',
     title: 'Caution means one thing, and the fingerprint covers behaviour',

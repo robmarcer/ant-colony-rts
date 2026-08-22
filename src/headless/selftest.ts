@@ -29,6 +29,21 @@ import {
   simulationHash,
   simulationSources,
 } from '../meta/fingerprint.js';
+import {
+  compareVersions,
+  manualInstructions,
+  missedVersions,
+  standing,
+  updatePlan,
+  updateWarnings,
+} from '../meta/update.js';
+import { releaseNotes } from '../meta/release-notes.js';
+import {
+  acknowledgements,
+  badgeLabel,
+  updatePanelHtml,
+  type UpdateStatusResponse,
+} from '../ui/update-badge.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1332,6 +1347,143 @@ console.log('caution controls how deep a guard will stand');
     'caution is not trivially outvoted by enemy activity',
     workersToOutweighCaution(10, 0) > 20,
     `${workersToOutweighCaution(10, 0).toFixed(1)} workers`,
+  );
+}
+
+console.log('the update check');
+{
+  // Issue #19. Everything here is a pure function of numbers and strings, so the
+  // version arithmetic and the refusal rules are decidable without a network.
+  check('an older version compares below a newer one', compareVersions('0.29.0', '0.30.0') < 0);
+  check('and the reverse', compareVersions('0.30.0', '0.29.0') > 0);
+  check('equal versions compare equal', compareVersions('0.30.0', '0.30.0') === 0);
+  check('a leading v is ignored, because tags carry one and APP_VERSION does not', compareVersions('v0.30.0', '0.30.0') === 0);
+  check('a missing component counts as zero', compareVersions('0.30', '0.30.0') === 0);
+  check(
+    'components compare numerically, not as text',
+    compareVersions('0.9.0', '0.10.0') < 0,
+    'string ordering would put 0.9.0 after 0.10.0',
+  );
+  check('rubbish sorts as zero rather than throwing', compareVersions('nonsense', '0.0.0') === 0);
+
+  check('no published release is unknown, not up to date', standing(APP_VERSION, null) === 'unknown');
+  check('matching the latest release is current', standing('0.30.0', '0.30.0') === 'current');
+  check('an older build is behind', standing('0.29.0', '0.30.0') === 'behind');
+  check(
+    'a build newer than the newest release is ahead, which is a normal state mid development',
+    standing('0.31.0', '0.30.0') === 'ahead',
+  );
+
+  check(
+    'the versions between current and latest are listed newest first',
+    JSON.stringify(missedVersions('0.27.0', '0.30.0')) === JSON.stringify(['0.30.0', '0.29.0', '0.28.0']),
+    JSON.stringify(missedVersions('0.27.0', '0.30.0')),
+  );
+  check('nothing is missed when up to date', missedVersions(APP_VERSION, APP_VERSION).length === 0);
+  check('nothing is missed when ahead', missedVersions('0.31.0', '0.30.0').length === 0);
+
+  const both = updateWarnings({ matchRunning: true, storedMatches: 180 });
+  check('a running match and stored matches both warn', both.length === 2);
+  check(
+    'the running match warning says the simulation is lost, not just that it restarts',
+    both.some((warning) => warning.id === 'running_match' && warning.message.includes('throws away')),
+  );
+  check(
+    'the stored match warning counts them and says they survive on disk',
+    both.some((warning) => warning.id === 'stored_matches' && warning.message.includes('180') && warning.message.includes('stay on disk')),
+  );
+  check('nothing to warn about warns about nothing', updateWarnings({ matchRunning: false, storedMatches: 0 }).length === 0);
+
+  const plan = updatePlan('git', 'v0.30.0');
+  check('the git plan fetches, checks out, installs and builds, in that order', JSON.stringify(plan.map((step) => `${step.command} ${step.args[0]}`)) === JSON.stringify(['git fetch', 'git checkout', 'npm ci', 'npm run']));
+  check('the plan checks out the tag it was given', plan[1].args.includes('v0.30.0'));
+  check('a container gets no plan, because it cannot rebuild itself', updatePlan('docker', 'v0.30.0').length === 0);
+  check('an unidentified install gets no plan either', updatePlan('unknown', 'v0.30.0').length === 0);
+  check(
+    'the container instructions name the image and say data survives',
+    manualInstructions('docker', 'v0.30.0').includes('docker pull') && manualInstructions('docker', 'v0.30.0').includes('survive'),
+  );
+  check('the fallback instructions give the commands to run by hand', manualInstructions('unknown', 'v0.30.0').includes('git checkout v0.30.0'));
+
+  // Release notes come from the same data as CHANGELOG.md, so a release page and
+  // the in-app changelog cannot disagree about what a version changed.
+  const notes = releaseNotes(APP_VERSION);
+  check('release notes exist for the running version', notes.length > 0);
+  check('and carry its title', notes.includes(CHANGELOG[0].title));
+  check(
+    'and every one of its changes',
+    CHANGELOG[0].changes.every((change) => notes.includes(change.detail)),
+  );
+  check('a version with no changelog entry throws rather than rendering an empty page', (() => {
+    try {
+      releaseNotes('99.0.0');
+      return false;
+    } catch {
+      return true;
+    }
+  })());
+  const reconstructed = CHANGELOG.find((entry) => entry.precision === 'reconstructed');
+  check(
+    'a reconstructed version says its timestamp is only accurate to the hour',
+    reconstructed === undefined || releaseNotes(reconstructed.version).includes('accurate to the hour'),
+  );
+
+  check('every changelog version renders notes', CHANGELOG.every((entry) => releaseNotes(entry.version).length > 0));
+}
+
+console.log('the update badge');
+{
+  const status = (over: Partial<UpdateStatusResponse> = {}): UpdateStatusResponse => ({
+    current: '0.29.0',
+    latest: '0.30.0',
+    standing: 'behind',
+    missedVersions: ['0.30.0'],
+    install: { kind: 'git', reason: 'a .git directory sits at the project root', updatable: true },
+    release: { version: '0.30.0', tag: 'v0.30.0', url: 'https://example.invalid', notes: 'notes' },
+    error: null,
+    warnings: [],
+    ...over,
+  });
+
+  check('being behind shows a badge naming the new version', badgeLabel(status()) === '0.30.0 available', String(badgeLabel(status())));
+  check(
+    'several versions behind says how many',
+    badgeLabel(status({ missedVersions: ['0.30.0', '0.29.0', '0.28.0'] })) === '0.30.0 available (3 versions behind)',
+  );
+  // Silence is the point. A badge that reports good news too is a badge nobody
+  // reads, and then the one time it matters it is invisible.
+  check('being up to date shows nothing', badgeLabel(status({ standing: 'current' })) === null);
+  check('being ahead shows nothing', badgeLabel(status({ standing: 'ahead' })) === null);
+  check('an unreachable GitHub shows nothing', badgeLabel(status({ standing: 'unknown', latest: null })) === null);
+
+  const noEscape = (input: string) => input;
+  const warned = status({
+    warnings: [
+      { id: 'running_match', message: 'a match is running' },
+      { id: 'stored_matches', message: '180 stored matches' },
+    ],
+  });
+  const panel = updatePanelHtml(warned, noEscape);
+  check('the panel states both warnings before offering the button', panel.indexOf('a match is running') < panel.indexOf('Update now'));
+  check('the panel offers to update a git checkout', panel.includes('Update now'));
+  check(
+    'and refuses a container, giving the reason instead of a button',
+    (() => {
+      const html = updatePanelHtml(
+        status({ install: { kind: 'docker', reason: '/.dockerenv exists', updatable: false } }),
+        noEscape,
+      );
+      return !html.includes('Update now') && html.includes('/.dockerenv exists');
+    })(),
+  );
+  check(
+    'every warning shown is acknowledged when applying',
+    JSON.stringify(acknowledgements(warned)) === JSON.stringify(['running_match', 'stored_matches']),
+  );
+  check('nothing is acknowledged when nothing was warned', acknowledgements(status()).length === 0);
+  check(
+    'the panel escapes what it interpolates',
+    updatePanelHtml(status({ latest: '<script>' }), (input) => input.replace('<', '&lt;')).includes('&lt;script>'),
   );
 }
 

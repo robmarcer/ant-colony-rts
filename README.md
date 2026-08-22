@@ -468,10 +468,53 @@ Two properties worth knowing, both asserted in the self test:
   makes the ladder a pure function of the match set, so recomputing always gives
   the same answer.
 - **Only comparable matches count.** Ratings pool only matches played under the
-  running balance numbers. A change to a unit cost makes older results a
-  different game, and the ladder reports how many it ignored rather than
-  averaging across them. Definitions are ranked per version, so revising one
-  does not inherit its old rating.
+  running balance numbers *and* the running simulation code. A change to a unit
+  cost, or to how a worker chooses a pile, makes older results a different game,
+  and the ladder reports how many it ignored rather than averaging across them.
+  Definitions are ranked per version, so revising one does not inherit its old
+  rating.
+
+## Staying up to date
+
+The server checks GitHub for a newer release and says so in the header. The check
+is server side, so the unauthenticated rate limit is spent once per process rather
+than once per open tab, and the result is cached for 15 minutes.
+
+```bash
+curl localhost:8787/api/update            # current against latest
+```
+
+The badge only appears when there is something to say. Being up to date, sitting
+ahead of the newest release, or being unable to reach GitHub are all silent, on
+the grounds that a badge which reports good news is a badge nobody reads.
+
+Applying an update is opt in and never automatic, and it warns first rather than
+after:
+
+- **A running match is lost.** Updating restarts the server, and a simulation you
+  are watching that has not been saved cannot be recovered.
+- **Stored matches may stop being ranked.** A new version can change the balance
+  numbers or the simulation code, and either drops your existing matches out of
+  the ladder. They stay on disk and stay readable; they stop being comparable.
+
+Each warning has to be acknowledged by name, so a client that never displayed one
+cannot wave it through with a single flag. `POST /api/update` accepts only
+loopback connections, because applying an update runs `git` and `npm` and on an
+exposed port that is remote code execution.
+
+How it updates depends on how it was installed, and it refuses rather than
+guessing: a git checkout is fetched, checked out, reinstalled and rebuilt in
+place, while a container is told to pull a new image on the host, since a
+container cannot rebuild itself into one. It never restarts itself, because a
+server that vanishes mid-request cannot tell you what it did.
+
+Releases are cut from the changelog, so a release page and the in-app changelog
+cannot disagree about what a version changed:
+
+```bash
+npm run releases              # print what would be published, create nothing
+npm run releases -- --publish # create them
+```
 
 ## Map fairness
 
