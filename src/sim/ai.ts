@@ -40,6 +40,7 @@ import {
 import type { StrategyConfig } from './strategy.js';
 import type { Colony, Nest, Unit, UnitType, Vec } from './types.js';
 import { scoreGuardPost } from './guard-score.js';
+import { broodSlotCost, shouldBuyBroodSlot } from './brood.js';
 import type { Simulation } from './sim.js';
 
 export function runUnitAi(sim: Simulation, unit: Unit): void {
@@ -145,6 +146,21 @@ function handleRecycling(sim: Simulation, unit: Unit): boolean {
     unit.recycling = false;
     return false;
   }
+  /*
+   * The floor is re-checked here, not only when the unit was marked.
+   *
+   * Marking and consuming are separated by however long the walk home takes, and
+   * combat during that walk can drop the colony to or below its worker floor. The
+   * surplus was clamped when the decision was made, so recycling was not wrong
+   * then, but consuming this worker now would leave the colony under the floor it
+   * asked for, with recycling a part of how it got there.
+   */
+  const colony = sim.colonies[unit.owner];
+  if (unit.type === 'worker' && sim.countUnits(unit.owner, 'worker') <= colony.strategy.min_worker_reserve) {
+    unit.recycling = false;
+    return false;
+  }
+
   unit.state = 'recycling';
   if (moveToward(sim, unit, home, UNIT_STATS[unit.type].speed) || sim.atNest(unit)) {
     sim.recycleUnit(unit);
@@ -164,39 +180,86 @@ function runQueenProduction(sim: Simulation, colony: Colony, queen: Unit): void 
   const nest = colony.nests.find((candidate) => candidate.queenId === queen.id);
   if (!nest) return;
 
-  if (queen.build) {
-    queen.build.secondsRemaining -= DT;
-    if (queen.build.secondsRemaining <= 0) {
-      const type = queen.build.type;
-      const spawned = sim.spawnUnit(type, colony.id, sim.nestSpawnPoint(nest));
-      colony.unitsProduced[type]++;
-      queen.build = null;
+  // Advance every slot, oldest first. Iterating backwards so a finished job can
+  // be spliced out without shifting one that has not been ticked yet.
+  for (let i = queen.builds.length - 1; i >= 0; i--) {
+    const job = queen.builds[i];
+    job.secondsRemaining -= DT;
+    if (job.secondsRemaining > 0) continue;
+    queen.builds.splice(i, 1);
+    const spawned = sim.spawnUnit(job.type, colony.id, sim.nestSpawnPoint(nest));
+    colony.unitsProduced[job.type]++;
 
-      if (type === 'queen') {
-        // A new queen leaves immediately for a site of her own.
-        spawned.foundingSite = chooseFoundingSite(sim, colony, nest);
-        spawned.state = 'founding';
-        sim.pushEvent(
-          'queen_walking',
-          colony.id,
-          `${colony.name} queen setting out for ${spawned.foundingSite.x.toFixed(0)}, ${spawned.foundingSite.y.toFixed(0)}`,
-          true,
-        );
-      }
+    if (job.type === 'queen') {
+      // A new queen leaves immediately for a site of her own.
+      spawned.foundingSite = chooseFoundingSite(sim, colony, nest);
+      spawned.state = 'founding';
+      sim.pushEvent(
+        'queen_walking',
+        colony.id,
+        `${colony.name} queen setting out for ${spawned.foundingSite.x.toFixed(0)}, ${spawned.foundingSite.y.toFixed(0)}`,
+        true,
+      );
     }
+  }
+
+  /*
+   * Expansion outranks capacity. A nest is worth more than a slot for the same
+   * food: it brings its own brood chamber, its own 2.5 food a second, and raises
+   * the population ceiling, where a slot only does the second of those.
+   *
+   * Getting this order wrong the first time was instructive. Buying capacity
+   * whenever it was affordable meant a colony saving for a 200 food queen always
+   * spent 120 on a slot first, and kept doing it, so expansion queued behind all
+   * 2,264 food of slots. preset-boom stopped reaching its second nest inside 300
+   * seconds. Capacity is for food that expansion has no use for, which is what
+   * the issue asked for and not what the first version did.
+   */
+  const nextUnit = chooseNextUnit(sim, colony);
+  const expanding = nextUnit === 'queen' && colony.food >= UNIT_STATS.queen.cost;
+
+  // Capacity is considered before filling slots, and only once a tick: checking
+  // it after filling every slot would mean a colony that can still just afford a
+  // worker never invests in being able to build two.
+  if (
+    !expanding &&
+    shouldBuyBroodSlot({
+      food: colony.food,
+      slots: queen.broodSlots,
+      investment: colony.strategy.capacity_investment,
+      belowWorkerFloor: sim.countUnits(colony.id, 'worker') < colony.strategy.min_worker_reserve,
+      atPopulationCeiling: nextUnit === null,
+    })
+  ) {
+    const cost = broodSlotCost(queen.broodSlots);
+    colony.food -= cost;
+    // Held on the queen rather than discarded, so the closed system stays
+    // closed: this is energy stored in the nest, and killUnit gives it back.
+    queen.broodInvestment += cost;
+    queen.broodSlots++;
+    colony.broodSlotsBought++;
+    sim.pushEvent(
+      'brood_slot_bought',
+      colony.id,
+      `${colony.name} nest raised its brood capacity to ${queen.broodSlots} for ${cost} food`,
+      false,
+    );
     return;
   }
 
-  const want = chooseNextUnit(sim, colony);
-  if (want === null) return; // at population capacity and not expanding
-  const cost = UNIT_STATS[want].cost;
-  if (colony.food < cost) return; // save up rather than build off-plan
-  colony.food -= cost;
-  queen.build = {
-    type: want,
-    secondsRemaining: UNIT_STATS[want].buildTime,
-    totalSeconds: UNIT_STATS[want].buildTime,
-  };
+  // Then fill whatever slots are free, as many as the stockpile covers this tick.
+  while (queen.builds.length < queen.broodSlots) {
+    const want = chooseNextUnit(sim, colony);
+    if (want === null) return; // at population capacity and not expanding
+    const cost = UNIT_STATS[want].cost;
+    if (colony.food < cost) return; // save up rather than build off-plan
+    colony.food -= cost;
+    queen.builds.push({
+      type: want,
+      secondsRemaining: UNIT_STATS[want].buildTime,
+      totalSeconds: UNIT_STATS[want].buildTime,
+    });
+  }
 }
 
 /**
@@ -208,8 +271,26 @@ function runQueenProduction(sim: Simulation, colony: Colony, queen: Unit): void 
  */
 function chooseNextUnit(sim: Simulation, colony: Colony): UnitType | null {
   const strategy = colony.strategy;
-  const workers = sim.countUnits(colony.id, 'worker');
-  const soldiers = sim.countUnits(colony.id, 'soldier');
+  /*
+   * Units already in a brood slot count against the ceiling and against the
+   * ratio, which they did not need to when a queen held a single slot: being at
+   * most one per queen over the cap was not worth the bookkeeping. With up to
+   * six slots per nest it is, and getting it wrong overshot a cap of 300 by 18.
+   *
+   * Counting them also stops the ratio oscillating. Filling six slots against
+   * live counts alone commits all six to whichever type is behind, and the ratio
+   * then overshoots the other way as they hatch.
+   */
+  let pendingWorkers = 0;
+  let pendingSoldiers = 0;
+  for (const queen of sim.queensOf(colony.id)) {
+    for (const job of queen.builds) {
+      if (job.type === 'worker') pendingWorkers++;
+      else if (job.type === 'soldier') pendingSoldiers++;
+    }
+  }
+  const workers = sim.countUnits(colony.id, 'worker') + pendingWorkers;
+  const soldiers = sim.countUnits(colony.id, 'soldier') + pendingSoldiers;
   const total = workers + soldiers;
 
   // Expansion is always allowed to proceed, even at capacity, because founding
@@ -225,15 +306,26 @@ function chooseNextUnit(sim: Simulation, colony: Colony): UnitType | null {
   return workers / total < strategy.unit_production_ratio.worker ? 'worker' : 'soldier';
 }
 
-/** Counts nests that exist, are being walked to, and are being built. */
+/**
+ * Counts every nest this colony is committed to: one per queen alive, plus one
+ * per queen being built.
+ *
+ * Counting queens rather than nests-plus-walkers matters. The old version added
+ * `nests.length`, `foundingQueensOf` and queens under construction, three
+ * mutable views that can briefly disagree during the tick a queen hatches or
+ * arrives. With a single build slot the window was too small to matter; with six
+ * it opened wide enough that a target of 3 committed to 4, because two queens
+ * were queued and only one of them was visible as in flight when the third was
+ * considered. A queen either holds a nest or is walking to one, so counting
+ * queens has no gap for the race to live in.
+ */
 function wantsAnotherNest(sim: Simulation, colony: Colony): boolean {
   const target = Math.min(colony.strategy.target_nests, MAX_NESTS_PER_COLONY);
-  const inFlight = sim.foundingQueensOf(colony.id).length;
   let underConstruction = 0;
   for (const queen of sim.queensOf(colony.id)) {
-    if (queen.build?.type === 'queen') underConstruction++;
+    for (const job of queen.builds) if (job.type === 'queen') underConstruction++;
   }
-  return colony.nests.length + inFlight + underConstruction < target;
+  return sim.queensOf(colony.id).length + underConstruction < target;
 }
 
 /**
@@ -246,8 +338,20 @@ function chooseFoundingSite(sim: Simulation, colony: Colony, parent: Nest): Vec 
   const strategy = colony.strategy;
   const enemy = sim.enemyColony(colony.id);
 
+  /*
+   * Clear of nests that exist *and* of sites other queens are already walking
+   * to. Checking only existing nests was sound while one queen walked at a time;
+   * once several can be in flight together, two of them pick the same rich
+   * cluster and settle inside the minimum separation of each other, because
+   * neither can see the other's destination.
+   */
+  const claimed = sim
+    .foundingQueensOf(colony.id)
+    .map((queen) => queen.foundingSite)
+    .filter((site): site is Vec => site !== null);
   const farEnoughFromOwn = (point: Vec): boolean =>
-    colony.nests.every((nest) => Math.hypot(nest.x - point.x, nest.y - point.y) >= MIN_NEST_SEPARATION);
+    colony.nests.every((nest) => Math.hypot(nest.x - point.x, nest.y - point.y) >= MIN_NEST_SEPARATION) &&
+    claimed.every((site) => Math.hypot(site.x - point.x, site.y - point.y) >= MIN_NEST_SEPARATION);
   // A founding queen is sent somewhere that looks safe from what the colony
   // knows. Settling next to a nest it never scouted is a real risk of not
   // scouting.

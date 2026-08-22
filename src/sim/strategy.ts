@@ -55,6 +55,20 @@ export interface StrategyConfig {
    */
   recycle_surplus: number;
   /**
+   * How readily surplus food is spent on brood slots rather than on units now.
+   *
+   * Issue #31: a queen raises one unit at a time by default, which caps a whole
+   * colony's spend at 2.5 food a second per queen while income scales with
+   * worker count. 47% of all food gathered was never spent by anyone. A slot
+   * raises that ceiling permanently, at a rising price.
+   *
+   * 0 never buys, which is a genuine off rather than a slow yes. 1 buys the
+   * moment a slot is affordable. Never bought below min_worker_reserve, and
+   * always bought at the population ceiling whatever this says, because there
+   * is nothing else left to spend on.
+   */
+  capacity_investment: number;
+  /**
    * Where a new queen prefers to settle. target_nests says how many nests you
    * want; this says which way to lean when choosing between candidate sites.
    * toward_food is the existing behaviour.
@@ -84,6 +98,7 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   risk_tolerance: 0.4,
   target_nests: 2,
   recycle_surplus: 0,
+  capacity_investment: 0.5,
   expansion_bias: 'toward_food',
   relocate_food: 0,
   scout_ratio: 0.12,
@@ -104,6 +119,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_food',
     relocate_food: 0,
     scout_ratio: 0.1,
+    capacity_investment: 1.0,
   },
   rush: {
     unit_production_ratio: { worker: 0.35, soldier: 0.65 },
@@ -117,6 +133,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_food',
     relocate_food: 0,
     scout_ratio: 0.05,
+    capacity_investment: 0,
   },
   harass: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -132,6 +149,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_enemy',
     relocate_food: 0.5,
     scout_ratio: 0.25,
+    capacity_investment: 0,
   },
   turtle: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -145,6 +163,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_safety',
     relocate_food: 0,
     scout_ratio: 0.08,
+    capacity_investment: 0.6,
   },
   blockade: {
     unit_production_ratio: { worker: 0.6, soldier: 0.4 },
@@ -158,6 +177,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_enemy',
     relocate_food: 0.5,
     scout_ratio: 0.2,
+    capacity_investment: 0.5,
   },
   scout: {
     unit_production_ratio: { worker: 0.8, soldier: 0.2 },
@@ -171,6 +191,7 @@ export const PRESETS: Record<string, StrategyConfig> = {
     expansion_bias: 'toward_food',
     relocate_food: 0,
     scout_ratio: 0.45,
+    capacity_investment: 0.4,
   },
 };
 
@@ -247,6 +268,13 @@ export function sanitiseStrategy(raw: unknown, fallback: StrategyConfig = DEFAUL
         numberOr(input.target_nests, 'target_nests', 1, MAX_NESTS_PER_COLONY, fallback.target_nests),
       ),
       recycle_surplus: numberOr(input.recycle_surplus, 'recycle_surplus', 0, 1, fallback.recycle_surplus),
+      capacity_investment: numberOr(
+        input.capacity_investment,
+        'capacity_investment',
+        0,
+        1,
+        fallback.capacity_investment,
+      ),
       expansion_bias: bias,
       relocate_food: numberOr(input.relocate_food, 'relocate_food', 0, 1, fallback.relocate_food),
       scout_ratio: numberOr(input.scout_ratio, 'scout_ratio', 0, 1, fallback.scout_ratio),
@@ -319,6 +347,13 @@ export const STRATEGY_JSON_SCHEMA = {
       enum: [...EXPANSION_BIASES],
       description:
         'Which way a new queen leans when choosing a site. toward_food takes the richest reachable cluster, the default and previous behaviour. toward_enemy settles forward, which extends how far contest_enemy_food and guard_food can reach but puts the nest and its queen closer to their army. toward_safety keeps nests behind your existing ones, slower to pay off and harder to kill.',
+    },
+    capacity_investment: {
+      type: 'number',
+      minimum: 0,
+      maximum: 1,
+      description:
+        'How readily surplus food is spent raising a nest\'s brood capacity rather than on units right now. A nest raises one unit at a time to begin with, and because a worker is 10 food over 4 seconds and a soldier 30 over 12, that caps your whole spend at 2.5 food a second per queen however much you are gathering. Each extra slot lifts that ceiling permanently, at a rising price of 120, 204, 347, 590 and 1003 food, to a maximum of six. 0 never buys one. 1 buys as soon as one is affordable. 0.5 waits until the stockpile is three times the price. Never bought while below min_worker_reserve, and always bought at the population ceiling regardless, because nothing else is left to buy.',
     },
     recycle_surplus: {
       type: 'number',

@@ -30,6 +30,7 @@ import {
   UNIT_STATS,
   type FoodType,
 } from './config.js';
+import { BROOD_SLOTS_INITIAL } from './config.js';
 import { HOME_NEST_POSITIONS, generateFood, generateObstacles } from './world.js';
 import { PRESETS, type StrategyConfig } from './strategy.js';
 import { RULE_EVAL_INTERVAL_SECONDS, parseDefinition, type BehaviourDefinition } from './definition.js';
@@ -197,6 +198,7 @@ export class Simulation {
       unitsLost: { queen: 0, worker: 0, soldier: 0 },
       recentLosses: 0,
       kills: 0,
+      broodSlotsBought: 0,
     };
   }
 
@@ -404,12 +406,33 @@ export class Simulation {
       lastDamagedTick: -9999,
       foundingSite: null,
       nestId: null,
-      build: null,
+      builds: [],
+      broodSlots: BROOD_SLOTS_INITIAL,
+      broodInvestment: 0,
       guardFoodId: null,
       recycling: false,
       relocateTo: null,
     };
     this.units.set(unit.id, unit);
+    /*
+     * Indexed immediately, not at the next rebuild.
+     *
+     * The roster and the spatial buckets are rebuilt on kill, on recycle and at
+     * the top of each tick, but nothing rebuilt them on spawn, so a unit created
+     * mid-tick was in `units` and invisible to `queensOf`, `unitsOf` and
+     * `countUnits` for the rest of that tick. With one build slot per queen the
+     * window was one unit wide and never mattered. With several it did: a queen
+     * hatching and then filling the freed slot in the same tick counted the
+     * colony as one queen short, and a target of three nests committed to four.
+     *
+     * Appending rather than rebuilding, because a rebuild walks every unit and
+     * spawning happens inside the production loop.
+     */
+    this.roster[owner].push(unit);
+    const key = bucketKey(unit.x, unit.y);
+    const bucket = this.buckets[owner].get(key);
+    if (bucket) bucket.push(unit);
+    else this.buckets[owner].set(key, [unit]);
     return unit;
   }
 
@@ -988,7 +1011,14 @@ export class Simulation {
     // A queen also returns whatever she had already invested in the unit she was
     // building; the brood dies with her, but the energy does not vanish.
     let value = UNIT_STATS[unit.type].cost * CORPSE_VALUE_FRACTION + unit.carrying;
-    if (unit.build) value += UNIT_STATS[unit.build.type].cost * CORPSE_VALUE_FRACTION;
+    // Every slot she was filling, not just the first. With one slot this was the
+    // same thing; with six, missing the rest would destroy energy on every
+    // queen kill and break the closed system.
+    for (const job of unit.builds) value += UNIT_STATS[job.type].cost * CORPSE_VALUE_FRACTION;
+    // The food sunk into her brood chamber comes back too. It has to go
+    // somewhere, and a nest that spent a thousand food on capacity being worth
+    // killing for it is the right incentive rather than an awkward consequence.
+    value += unit.broodInvestment * CORPSE_VALUE_FRACTION;
     this.addCorpse({ x: unit.x, y: unit.y }, value);
 
     for (const other of this.units.values()) {
@@ -1244,7 +1274,8 @@ export class Simulation {
     for (const colony of this.colonies) total += colony.food;
     for (const unit of this.units.values()) {
       total += UNIT_STATS[unit.type].cost + unit.carrying;
-      if (unit.build) total += UNIT_STATS[unit.build.type].cost;
+      for (const job of unit.builds) total += UNIT_STATS[job.type].cost;
+      total += unit.broodInvestment;
     }
     return total;
   }

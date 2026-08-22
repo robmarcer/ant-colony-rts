@@ -231,9 +231,13 @@ function updatePanels(): void {
     const founding = sim.foundingQueensOf(id).length;
     const panel = el<HTMLDivElement>(id === 0 ? 'panelA' : 'panelB');
     const hp = sim.lowestQueenHealth(id);
+    // Slots are shown as a fraction, because "3 of 4 slots busy" is the thing
+    // worth seeing once capacity is something a colony buys.
+    const slots = queens.reduce((sum, queen) => sum + queen.broodSlots, 0);
+    const busy = queens.reduce((sum, queen) => sum + queen.builds.length, 0);
     const building = queens
-      .filter((queen) => queen.build)
-      .map((queen) => `${queen.build!.type} ${(queen.build!.totalSeconds - queen.build!.secondsRemaining).toFixed(0)}/${queen.build!.totalSeconds}s`)
+      .flatMap((queen) => queen.builds)
+      .map((job) => `${job.type} ${(job.totalSeconds - job.secondsRemaining).toFixed(0)}/${job.totalSeconds}s`)
       .join(', ');
     const knobs = knobRows(colony.strategy);
     const changed = describeStrategy(colony.strategy) !== lastKnobs[id];
@@ -253,7 +257,7 @@ function updatePanels(): void {
       <p class="sub">queens ${queens.length}${founding > 0 ? ` (${founding} walking)` : ''},
         weakest ${queens.length ? `${Math.round(hp * 100)}%` : 'none'} · hauled ${Math.round(colony.lifetimeFoodGathered)} ·
         kills ${colony.kills} · lost ${colony.unitsLost.worker + colony.unitsLost.soldier} ·
-        building ${building || 'nothing'}</p>
+        brood ${busy}/${slots} · building ${building || 'nothing'}</p>
       <ul class="knobs">
         ${knobs.map(([key, value]) => `<li class="${changed ? 'changed' : ''}"><span>${key}</span><b>${escape(value)}</b></li>`).join('')}
       </ul>

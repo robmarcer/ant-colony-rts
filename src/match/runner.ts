@@ -177,6 +177,7 @@ function colonyStats(sim: Simulation, id: ColonyId): ColonyStats {
     finalNests: colony.nests.length,
     nestsFounded: colony.nestsFounded,
     queensLostInTransit: colony.queensLostInTransit,
+    broodSlotsBought: colony.broodSlotsBought,
     queenAlive: sim.isAlive(id),
     queenHpPct: Math.round(sim.lowestQueenHealth(id) * 100),
     score: sim.scoreOf(id),
@@ -251,7 +252,8 @@ export function renderDigest(record: MatchRecord, series: SeriesSample[]): strin
     );
     lines.push(
       `    final w${colony.finalWorkers}/s${colony.finalSoldiers} queens ${colony.finalQueens} nests ${colony.finalNests}` +
-        ` (founded ${colony.nestsFounded}, ${colony.queensLostInTransit} queens killed in transit) food ${colony.finalFood}` +
+        ` (founded ${colony.nestsFounded}, ${colony.queensLostInTransit} queens killed in transit,` +
+        ` ${colony.broodSlotsBought} brood slots) food ${colony.finalFood}` +
         ` lifetime ${colony.lifetimeFood} (${colony.foodPerMinute}/min) weakest queen ${colony.queenAlive ? `${colony.queenHpPct}%` : 'ELIMINATED'}`,
     );
     lines.push(

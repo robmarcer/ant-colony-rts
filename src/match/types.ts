@@ -19,6 +19,8 @@ export interface ColonyStats {
   finalNests: number;
   nestsFounded: number;
   queensLostInTransit: number;
+  /** Brood slots bought, so the log shows what a colony did with its surplus. */
+  broodSlotsBought: number;
   /** True while the colony still has at least one queen. */
   queenAlive: boolean;
   queenHpPct: number;

@@ -1,10 +1,50 @@
 # Changelog
 
-Current version: **0.31.0**. 31 releases, 215 recorded changes.
+Current version: **0.32.0**. 32 releases, 230 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.32.0 — Food buys the ability to spend food
+
+2026-08-23 01:38 (UTC+07:00) · committed · 15 changes
+
+**Simulation**
+
+- Brood slots. A nest raises several units at once instead of one, and slots are bought rather than granted, at 120, 204, 347, 590 and 1003 food to a maximum of six. Issue #31. A queen held a single build slot, and because a worker is 10 food over 4 seconds and a soldier 30 over 12, both come to 2.5 food a second, so a colony's entire spend rate was 2.5 times its queen count however fast it gathered. 47% of all food gathered across 180 matches was never spent by anybody, and every definition earned between 1.3 and 2.3 times faster than it could spend.
+- Fix: Units in a brood slot now count against the population ceiling and against unit_production_ratio. With one slot per queen, being at most one over the cap was not worth the bookkeeping; with six it overshot a cap of 300 by 18. Counting them also stops the ratio oscillating, since filling six slots against live counts alone commits every one of them to whichever type is behind.
+- Fix: A spawned unit is added to the roster and the spatial buckets immediately. They were rebuilt on kill, on recycle and at the top of each tick, but never on spawn, so a unit created mid-tick was invisible to queensOf, unitsOf and countUnits for the rest of that tick. With one build slot the window was one unit wide and never mattered. With several it did: a queen hatching and refilling the freed slot in the same tick counted the colony one queen short, and a target of three nests committed to four.
+- Food spent on capacity is tracked on the queen and counted toward the map total, and comes back as a corpse when she dies. The map is a closed system, so a slot cannot simply consume energy, and a heavily invested nest being worth killing for is the right incentive rather than an awkward consequence.
+
+**Unit AI**
+
+- A capacity_investment knob, 0 to 1, deciding how readily surplus goes into capacity rather than units. 0 is a genuine off rather than a slow yes, which is what makes it usable as a control.
+- Fix: Expansion outranks capacity: a queen the colony can afford is built first. The first version had it the other way round, and a colony saving for a 200 food queen bought a 120 food slot first every time, so expansion queued behind all 2,264 food of slots and preset-boom stopped reaching a second nest inside 300 seconds. A nest is worth more than a slot for the same food because it arrives with a brood chamber of its own and raises the population ceiling too.
+- Fix: An earlier version bought a slot at the population ceiling whatever the knob said, on the grounds that nothing else was buyable. That overrode an explicit instruction, so a definition asking for no capacity bought twenty slots and no control was left to measure against. The reasoning was also weak: at the ceiling extra slots only replace losses faster, since the population cannot exceed the cap.
+- Fix: A founding queen now avoids sites other queens are already walking to, not just nests that exist. Checking only existing nests was sound while one queen walked at a time; with several in flight, two picked the same rich cluster and settled inside the minimum separation.
+- Fix: The worker floor is re-checked when a recycled unit is consumed, not only when it is marked. Marking and consuming are separated by the walk home, and combat during that walk can drop the colony to its floor, which made recycling complicit in breaching it.
+
+**Balance**
+
+- Measured over a fresh round robin of 180 matches: unspent food fell from 47.1% of everything gathered to 8.7%, which was the acceptance criterion for #31. The worst hoarder is now preset-turtle at 18.0%, where the previous range was 27% to 57%; claude-v1 spends all but 3.3%. Colonies also gather 19% more, 3,127,638 against 2,618,121, because capacity lets them convert food into the workers that fetch more of it.
+- Matches are more decisive: 60 of 180 ended by eliminating a colony, against 43 before. Mean units on the map rose from 120 to 163. Ladder: claude-v1 2373, example-adaptive 1920, preset-boom 1721, example-mass-rush 1656, preset-blockade 1564, preset-balanced 1473, preset-scout 1380, preset-turtle 1166, preset-rush 1124, preset-harass 621. The order barely moved but the ends stretched, and preset-harass collapsed to 0-36 from 3-33. It sets capacity_investment to 0, and against opponents who now convert their surplus into army it has nothing to trade on.
+
+**Performance**
+
+- The self test takes about ten minutes, up from around three. Shortening the new runs barely moved it, 9m54 against 10m04, because the cause is that colonies now spend their food and field far bigger armies, so every test in the file does more work per tick. That cost belongs to the feature.
+
+**Viewer**
+
+- The colony panel shows brood slots busy against total, which is the thing worth seeing once capacity is something a colony buys.
+
+**Tests**
+
+- Twenty-two checks. Nine price and decide the purchase as pure numbers, including that zero never buys and that the cap is unaffordable rather than merely capped. The rest cover the closed system under parallel brood, that a queen dying returns every slot she was filling plus her brood chamber, and that investing shortens the time to 250 units. The last one replaced an assertion that investing puts more units on the map, which is false: both colonies finish on the same 398 because the population cap binds either way, and what capacity buys is the rate.
+
+**Docs**
+
+- capacity_investment documented in docs/behaviour.md and docs/agent-brief.md, with the measurement behind it and the reason expansion outranks it.
 
 ## 0.31.0 — The app knows when it is out of date
 

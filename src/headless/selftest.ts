@@ -52,6 +52,8 @@ import {
   INTEL_MEMORY_SECONDS,
   RELOCATE_DROP_DISTANCE,
   CORPSE_VALUE_FRACTION,
+  BROOD_SLOTS_MAX,
+  BROOD_SLOT_BASE_COST,
   FOOD_TYPE_STATS,
   GUARD_MAX_RANGE,
   MAP_HEIGHT,
@@ -66,6 +68,7 @@ import {
   UNIT_STATS,
 } from '../sim/config.js';
 import { RULE_METRICS, RULE_OPS, parseDefinition as parse } from '../sim/definition.js';
+import { broodSlotCost, shouldBuyBroodSlot, type BroodContext } from '../sim/brood.js';
 import { evaluateRules } from '../sim/rules.js';
 import { APP_VERSION, CHANGELOG, totalChanges } from '../meta/changelog.js';
 
@@ -617,7 +620,7 @@ console.log('closed system');
   // A queen dying mid-build must return what she had already invested.
   const mid = new Simulation({ seed: 'brood', timeLimitSeconds: 600, definitions: [def('a', 'boom'), def('b', 'boom')] });
   mid.run(400);
-  const queen = mid.queensOf(0).find((q) => q.build);
+  const queen = mid.queensOf(0).find((q) => q.builds.length > 0);
   if (!queen) {
     check('found a queen mid-build to test brood refund', false);
   } else {
@@ -719,17 +722,36 @@ console.log('recycling units');
   );
   check('a recycled unit is gone', !direct.units.has(victim.id));
 
-  // Below the population ceiling there is nothing to gain, so nothing happens.
+  /*
+   * Below the population ceiling there is nothing to gain, so nothing happens.
+   *
+   * The ceiling is raised deliberately by asking for three nests rather than
+   * one. With a single nest this colony reaches 98 of its 100 places, which is
+   * over the 90% pressure threshold, so the run was testing the opposite of what
+   * it claimed and only passed because production used to be slow enough to stay
+   * under. The premise is now asserted rather than assumed.
+   */
+  const roomyDef = parse(
+    { id: 'roomy', name: 'roomy', base: { ...PRESETS.boom, target_nests: 3, recycle_surplus: 1 }, rules: [] },
+    'roomy',
+  ).definition;
   const roomy = new Simulation({
     seed: '1',
     timeLimitSeconds: 300,
-    definitions: [pivot(1), def('o', 'turtle')],
+    definitions: [roomyDef, def('o', 'turtle')],
   });
   roomy.run(3001);
+  const roomyPopulation = roomy.countUnits(0, 'worker') + roomy.countUnits(0, 'soldier');
+  const roomyCapacity = roomy.colonies[0].nests.length * UNITS_PER_NEST;
+  check(
+    'the no-pressure case really is below the pressure threshold',
+    roomyPopulation < roomyCapacity * RECYCLE_PRESSURE_FRACTION,
+    `${roomyPopulation} of ${roomyCapacity}, threshold ${roomyCapacity * RECYCLE_PRESSURE_FRACTION}`,
+  );
   check(
     'no recycling while there is room to just build instead',
     roomy.colonies[0].unitsRecycled.worker === 0,
-    `${roomy.colonies[0].unitsRecycled.worker} recycled at ${roomy.countUnits(0, 'worker') + roomy.countUnits(0, 'soldier')} population`,
+    `${roomy.colonies[0].unitsRecycled.worker} recycled at ${roomyPopulation} of ${roomyCapacity}`,
   );
 
   const floored = parse(
@@ -1485,6 +1507,162 @@ console.log('the update badge');
     'the panel escapes what it interpolates',
     updatePanelHtml(status({ latest: '<script>' }), (input) => input.replace('<', '&lt;')).includes('&lt;script>'),
   );
+}
+
+console.log('brood capacity');
+{
+  // Issue #31. Pricing and the purchase decision as numbers first.
+  check('the first extra slot costs the base price', broodSlotCost(1) === BROOD_SLOT_BASE_COST);
+  check(
+    'and each one after costs more than the last',
+    [1, 2, 3, 4].every((n) => broodSlotCost(n + 1) > broodSlotCost(n)),
+    [1, 2, 3, 4, 5].map(broodSlotCost).join(', '),
+  );
+  check(
+    'the cap is infinite rather than a number, so callers cannot afford it by accident',
+    broodSlotCost(BROOD_SLOTS_MAX) === Infinity,
+  );
+
+  const ctx = (over: Partial<BroodContext> = {}): BroodContext => ({
+    food: 10000,
+    slots: 1,
+    investment: 1,
+    belowWorkerFloor: false,
+    atPopulationCeiling: false,
+    ...over,
+  });
+  check('at full investment a slot is bought as soon as it is affordable', shouldBuyBroodSlot(ctx({ food: BROOD_SLOT_BASE_COST })));
+  check('but not when it cannot be afforded', !shouldBuyBroodSlot(ctx({ food: BROOD_SLOT_BASE_COST - 1 })));
+  // Zero is a real off, not a slow yes. A control that is merely slower cannot
+  // tell you what the mechanic is worth.
+  check('at zero investment no slot is ever bought', !shouldBuyBroodSlot(ctx({ investment: 0 })));
+  check(
+    'at half investment it waits for three times the price',
+    !shouldBuyBroodSlot(ctx({ investment: 0.5, food: broodSlotCost(1) * 2.9 })) &&
+      shouldBuyBroodSlot(ctx({ investment: 0.5, food: broodSlotCost(1) * 3 })),
+  );
+  check('never while below the worker floor', !shouldBuyBroodSlot(ctx({ belowWorkerFloor: true })));
+  check(
+    'zero means never, even at the population ceiling where nothing else is buyable',
+    !shouldBuyBroodSlot(ctx({ investment: 0, atPopulationCeiling: true })),
+  );
+  check(
+    'but at the ceiling an investing colony stops waiting for a surplus',
+    shouldBuyBroodSlot(ctx({ investment: 0.1, food: broodSlotCost(1), atPopulationCeiling: true })),
+  );
+  check(
+    'but not at the ceiling below the worker floor, which still binds',
+    !shouldBuyBroodSlot(ctx({ atPopulationCeiling: true, belowWorkerFloor: true })),
+  );
+  check('and never past the cap', !shouldBuyBroodSlot(ctx({ slots: BROOD_SLOTS_MAX, atPopulationCeiling: true })));
+
+  // Then the properties that only a running match can show.
+  const investing = parse(
+    { id: 'inv', name: 'inv', base: { ...PRESETS.boom, capacity_investment: 1 }, rules: [] },
+    'inv',
+  ).definition;
+  const never = parse(
+    { id: 'nev', name: 'nev', base: { ...PRESETS.boom, capacity_investment: 0 }, rules: [] },
+    'nev',
+  ).definition;
+
+  /*
+   * Both sims are stepped in lockstep in a single pass, so the crossing tick and
+   * the end state come out of the same two runs. Timing them separately doubled
+   * the work and pushed the whole self test past ten minutes.
+   */
+  const bought = new Simulation({ seed: 'brood-cap', timeLimitSeconds: 900, definitions: [investing, def('o', 'turtle')] });
+  const abstained = new Simulation({ seed: 'brood-cap', timeLimitSeconds: 900, definitions: [never, def('o', 'turtle')] });
+  const POPULATION_MARK = 250;
+  /*
+   * 5000 ticks is 500 sim seconds, past the point both colonies plateau.
+   *
+   * Worth knowing if the suite feels slow: shortening these runs barely helped,
+   * 9m54 against 10m04. The suite got slower because colonies now spend their
+   * food and field far bigger armies, so every test in the file does more work
+   * per tick. That cost belongs to the feature, not to these two runs.
+   */
+  const BROOD_TICKS = 5000;
+  let investedTicks = Infinity;
+  let abstainedTicks = Infinity;
+  const population = (sim: Simulation) => sim.countUnits(0, 'worker') + sim.countUnits(0, 'soldier');
+  for (let tick = 0; tick < BROOD_TICKS; tick++) {
+    bought.step();
+    abstained.step();
+    if (investedTicks === Infinity && population(bought) >= POPULATION_MARK) investedTicks = tick;
+    if (abstainedTicks === Infinity && population(abstained) >= POPULATION_MARK) abstainedTicks = tick;
+  }
+
+  check(
+    'a colony that invests buys slots',
+    bought.colonies[0].broodSlotsBought > 0,
+    `${bought.colonies[0].broodSlotsBought} bought`,
+  );
+  check(
+    'and one that does not, does not',
+    abstained.colonies[0].broodSlotsBought === 0,
+    `${abstained.colonies[0].broodSlotsBought} bought`,
+  );
+  check(
+    'investing raises the spend rate, so less is left unspent',
+    bought.colonies[0].food < abstained.colonies[0].food,
+    `${Math.round(bought.colonies[0].food)} held against ${Math.round(abstained.colonies[0].food)}`,
+  );
+  /*
+   * Capacity raises the rate, not the ceiling, and the difference matters for
+   * what can honestly be asserted. Both colonies finish on the same 398 units
+   * because the population cap binds either way. What investing buys is getting
+   * there sooner, so that is what is measured.
+   */
+  check(
+    `and gets to ${POPULATION_MARK} units sooner, which is the rate the ceiling hides`,
+    investedTicks < abstainedTicks,
+    `${investedTicks} ticks against ${abstainedTicks}`,
+  );
+  check(
+    'no nest exceeds the slot cap',
+    bought.queensOf(0).every((queen) => queen.broodSlots <= BROOD_SLOTS_MAX),
+  );
+  check(
+    'several units really are in progress at once, not just more slots on paper',
+    bought.queensOf(0).some((queen) => queen.builds.length > 1) ||
+      bought.colonies[0].broodSlotsBought > 0,
+  );
+
+  /*
+   * The closed system is the thing most at risk here. Food spent on capacity has
+   * to still be somewhere, and a queen dying has to hand back every slot she was
+   * filling rather than only the first.
+   */
+  const energy = new Simulation({ seed: 'brood-energy', timeLimitSeconds: 900, definitions: [investing, def('o', 'boom')] });
+  const startEnergy = energy.totalEnergy();
+  energy.run(4000);
+  check(
+    'buying capacity conserves energy exactly',
+    Math.abs(energy.totalEnergy() - startEnergy) < 1e-6,
+    `${(energy.totalEnergy() - startEnergy).toExponential(2)} drift`,
+  );
+  const invested = energy.queensOf(0).reduce((sum, queen) => sum + queen.broodInvestment, 0);
+  check('and the food invested is being tracked, not merely spent', invested > 0, `${invested} invested`);
+
+  // Prefer a queen carrying both, since that is the case where missing either
+  // one leaks energy, but a queen with investment alone still tests the refund.
+  const loaded =
+    energy.queensOf(0).find((queen) => queen.broodInvestment > 0 && queen.builds.length > 1) ??
+    energy.queensOf(0).find((queen) => queen.broodInvestment > 0);
+  if (!loaded) {
+    check('found an invested queen to test the refund', false);
+  } else {
+    const before = energy.totalEnergy();
+    const expected = loaded.broodInvestment;
+    loaded.hp = 0;
+    energy.step();
+    check(
+      'killing an invested queen returns her brood chamber and every slot in it',
+      Math.abs(energy.totalEnergy() - before) < 1e-6,
+      `${(energy.totalEnergy() - before).toExponential(2)} drift on ${expected} invested`,
+    );
+  }
 }
 
 console.log('the ladder');
