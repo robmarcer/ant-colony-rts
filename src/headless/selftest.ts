@@ -18,9 +18,18 @@ import {
   hexToRgb,
   relativeLuminance,
 } from '../ui/soil.js';
+import { scoreGuardPost, workersToOutweighCaution } from '../sim/guard-score.js';
+import type { GuardCandidate } from '../sim/guard-score.js';
 import type { MatchSummaryRow } from '../match/types.js';
-import { balanceFingerprint } from '../meta/fingerprint.js';
-import { readFileSync } from 'node:fs';
+import {
+  balanceFingerprint,
+  balanceValuesHash,
+  fingerprintDrift,
+  hashSources,
+  simulationHash,
+  simulationSources,
+} from '../meta/fingerprint.js';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -29,6 +38,7 @@ import {
   RELOCATE_DROP_DISTANCE,
   CORPSE_VALUE_FRACTION,
   FOOD_TYPE_STATS,
+  GUARD_MAX_RANGE,
   MAP_HEIGHT,
   MAP_WIDTH,
   MAX_NESTS_PER_COLONY,
@@ -1057,6 +1067,63 @@ console.log('replay is version pinned');
   }
   check('replaying a record from before version stamping is refused', refusedUnstamped);
   check('the balance fingerprint is stable across calls', balanceFingerprint() === balanceFingerprint());
+
+  /*
+   * Issue #25. The fingerprint used to cover only the config exports, and that
+   * gap gave a wrong answer once for real: a change to how workers scouted
+   * altered match outcomes without touching a number, every stored match still
+   * claimed to be comparable, and the ladder pooled two different simulations
+   * into one rating. So the simulation source is hashed too.
+   */
+  const sources = simulationSources();
+  const simFiles = readdirSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'sim')).filter((f) =>
+    f.endsWith('.ts'),
+  );
+  check(
+    'the fingerprint covers every simulation source file',
+    sources.length === simFiles.length && simFiles.every((f) => sources.some((source) => source.file === f)),
+    `hashed ${sources.length} of ${simFiles.length}`,
+  );
+  check('and none of them are empty', sources.every((source) => source.text.length > 0));
+
+  const [first, ...rest] = sources;
+  check(
+    'changing a line of simulation code changes the fingerprint',
+    hashSources([{ file: first.file, text: `${first.text}\nconst x = 1;` }, ...rest]) !== hashSources(sources),
+  );
+  check(
+    'and so does adding a new simulation file',
+    hashSources([...sources, { file: 'zz-new.ts', text: 'export const x = 1;' }]) !== hashSources(sources),
+  );
+  check(
+    'but the order files are listed in does not',
+    hashSources([...sources].sort((a, b) => (a.file < b.file ? 1 : -1)).sort((a, b) => (a.file < b.file ? -1 : 1))) ===
+      hashSources(sources),
+  );
+  check(
+    'the fingerprint names both halves so a mismatch can say which moved',
+    balanceFingerprint() === `${balanceValuesHash()}-${simulationHash()}`,
+    balanceFingerprint(),
+  );
+  check('a matching fingerprint reports no drift', (() => {
+    const drift = fingerprintDrift(balanceFingerprint());
+    return !drift.balance && !drift.simulation;
+  })());
+  check('a changed simulation half is reported as the simulation half', (() => {
+    const drift = fingerprintDrift(`${balanceValuesHash()}-deadbeef`);
+    return drift.simulation && !drift.balance;
+  })());
+  check('a changed balance half is reported as the balance half', (() => {
+    const drift = fingerprintDrift(`deadbeef-${simulationHash()}`);
+    return drift.balance && !drift.simulation;
+  })());
+  check(
+    'an old single-part fingerprint is reported as both, not as a match',
+    (() => {
+      const drift = fingerprintDrift(balanceValuesHash());
+      return drift.balance && drift.simulation;
+    })(),
+  );
 }
 
 console.log('expansion bias');
@@ -1191,6 +1258,80 @@ console.log('the ground stays dark enough to see things on');
   check(
     'and a different seed gives different ground',
     groundLuminanceStats(generateSoil(256, 999)).peak !== stats.peak,
+  );
+}
+
+console.log('caution controls how deep a guard will stand');
+{
+  /*
+   * Issue #27. The claim in the docs is that a cautious colony avoids guarding
+   * piles close to a known enemy nest. Trying to see that from a finished match
+   * failed four times, because a post is held until the pile runs out: a pile
+   * that was safe when chosen can end up beside a nest founded an hour later,
+   * so the end state cannot separate "caution did nothing" from "caution worked
+   * and then the world moved". Scored as numbers, the claim is decidable.
+   */
+  const pile = (over: Partial<GuardCandidate>): GuardCandidate => ({
+    amount: 300,
+    density: 1,
+    fromOwnNest: 60,
+    fromEnemyNest: 100,
+    enemyWorkersPresent: 0,
+    ...over,
+  });
+  const exposed = pile({ fromEnemyNest: 10 });
+  const safe = pile({ fromEnemyNest: 100 });
+  const preference = (risk: number) => scoreGuardPost(exposed, risk).total - scoreGuardPost(safe, risk).total;
+
+  check(
+    'at maximum caution an exposed pile scores below an otherwise identical safe one',
+    scoreGuardPost(exposed, 0).total < scoreGuardPost(safe, 0).total,
+    `exposed ${scoreGuardPost(exposed, 0).total.toFixed(1)} against safe ${scoreGuardPost(safe, 0).total.toFixed(1)}`,
+  );
+  check(
+    'and at no caution at all it scores above it',
+    scoreGuardPost(exposed, 1).total > scoreGuardPost(safe, 1).total,
+    `exposed ${scoreGuardPost(exposed, 1).total.toFixed(1)} against safe ${scoreGuardPost(safe, 1).total.toFixed(1)}`,
+  );
+
+  // The bug behind #27 was not a dead term, it was two terms fighting: denial
+  // rewarded a pile for being deep in their half while exposure punished it for
+  // the same thing, and only exposure was gated by risk. So the crossover sat
+  // wherever the arithmetic happened to put it, which is why measuring across
+  // risk values found no consistent direction. Monotonicity is the fix, and it
+  // is the property worth pinning.
+  const steps = 20;
+  let previous = -Infinity;
+  let breaks = '';
+  for (let i = 0; i <= steps; i++) {
+    const risk = i / steps;
+    const value = preference(risk);
+    if (value <= previous) breaks += ` risk ${risk.toFixed(2)} did not increase;`;
+    previous = value;
+  }
+  check('risk_tolerance moves the preference for depth in one direction only', breaks === '', breaks);
+
+  check(
+    'a pile with no enemy workers on it is worth less than the same pile being worked',
+    scoreGuardPost(pile({}), 0.5).total < scoreGuardPost(pile({ enemyWorkersPresent: 4 }), 0.5).total,
+  );
+  check(
+    'a dense pile outscores a bigger thin one, because denial is a rate',
+    scoreGuardPost(pile({ amount: 200, density: 1.9 }), 0.5).total >
+      scoreGuardPost(pile({ amount: 400, density: 0.6 }), 0.5).total,
+  );
+  check(
+    'a pile beyond guard range is penalised hard enough to be rejected',
+    scoreGuardPost(pile({ fromOwnNest: GUARD_MAX_RANGE + 40 }), 0.5).total < scoreGuardPost(pile({}), 0.5).total - 100,
+  );
+
+  // Recorded so a later reweighting cannot quietly make caution unbuyable: at
+  // maximum caution it takes this many enemy workers on a pile 10 cells from
+  // their nest before the activity term outvotes the penalty.
+  check(
+    'caution is not trivially outvoted by enemy activity',
+    workersToOutweighCaution(10, 0) > 20,
+    `${workersToOutweighCaution(10, 0).toFixed(1)} workers`,
   );
 }
 

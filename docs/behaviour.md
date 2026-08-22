@@ -139,9 +139,19 @@ Area denial. Soldiers pick a pile, stand on it, and fight only what comes within
 worker is not guarding anything.
 
 Post selection prefers, in rough order of weight: piles enemy workers are
-currently working, then large piles, then piles closer to the enemy than to you,
-minus a penalty for distance from your own nests and, if `risk_tolerance` is low,
-a penalty for sitting near their nest. Guards are assigned in pairs, because a
+currently working, then dense piles, then large piles, minus a penalty for
+distance from your own nests. How deep into their half a guard is willing to
+stand is set by `risk_tolerance` alone: it scales both the reward for a pile
+being closer to them than to you and, inversely, the penalty for sitting near
+their nest, so the knob moves the preference in one direction over its whole
+range. It did not always: for a while the reward for depth was ungated while the
+penalty was gated, the two fought, and which one won depended on where the
+arithmetic happened to cross. That made the knob mean nothing in the middle of
+its range, which is why measuring guard posts across a match found no consistent
+relationship with caution. The scoring is now a pure function in
+`src/sim/guard-score.ts` and its monotonicity is asserted directly, because a
+finished match cannot show it: a post is held until the pile runs out, so a pile
+that was safe when chosen can end up beside a nest founded an hour later. Guards are assigned in pairs, because a
 lone soldier loses to four or five massed workers, and coverage grows with army
 size up to six piles. A guard walks to its pile and then holds, rather than
 driving at the exact centre, which would have it oscillate against the units it
@@ -300,6 +310,9 @@ Willingness to take a bad fight, and also economic caution.
 - Foraging: food near the enemy nest is discounted by
   `((40 - distance_to_enemy_nest) / 40) * 30 * (1 - risk_tolerance)`, so a
   cautious colony avoids hauling from the enemy's back yard.
+- Guard posts: at `0` a guard will not take a post near a known enemy nest even
+  when the pile there is the one costing you most; at `1` it prefers exactly
+  those posts. See `guard_food` above.
 
 ## Rule metrics
 

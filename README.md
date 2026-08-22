@@ -383,36 +383,42 @@ in the browser reproduces the server's scores exactly.
 ## Balance
 
 The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
-matches are not degenerate. Current state, measured over a round robin of the
-starter definitions across two seeds (112 matches):
+matches are not degenerate. Every figure below comes from one round robin of the
+ten starter definitions over two seeds with sides swapped, 180 matches, all under
+the same fingerprint:
 
-- Win rates spread from 0% to 100% across ten definitions, on the ladder over 180
-  comparable matches under fog of war.
-- The strongest definition is `claude-v1`, written by a model reading
-  `docs/agent-brief.md` and the ladder, at 2052.
+- Ratings run 2340 down to 932. The strongest is `claude-v1`, written by a model
+  reading `docs/agent-brief.md` and the ladder, at 36-0.
+- Then example-adaptive 1857, preset-boom 1743, example-mass-rush 1675,
+  preset-blockade 1549, preset-balanced 1424, preset-scout 1392, preset-rush
+  1065, preset-turtle 1023, preset-harass 932.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
-- Every strategy above 60% expands. The two one-nest presets sit at 28% and 16%.
-- Area denial is strong: preset-blockade, which does nothing but post soldiers on
-  food, is second at 81%.
-- Fog of war compressed the field: with enemy figures now beliefs that can be
-  blind or stale, reactive strategies lost some of their edge. example-adaptive
-  and example-mass-rush both sit at 1732, preset-boom at 1700, and the spread
-  between second and eighth narrowed to 530 points.
-- Measurements quoted here come from a cleared match store, for the reason in
-  issue #25: the balance fingerprint does not cover simulation behaviour, so a
-  code change can leave stale matches looking comparable.
-- Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
-  walk, so expansion is a strong play whose real cost is the 200 food and the
-  minute of lost production rather than the risk of interception.
+- Expansion is what the ranking tracks most closely. The top two found 3.9 and
+  3.1 nests a match; the bottom two found none at all. Ordering the field by
+  nests founded gets the top four and the bottom three in the right places.
+- Area denial is no longer strong. preset-blockade, which does nothing but post
+  soldiers on food, sits fifth at 55.6%. It was second at 81% before the
+  population ceiling and the terrain landed, and that is what issue #24 is about:
+  the posture's claim did not survive a change in scale.
+- 541 nests were founded across the 180 matches and only 7 queens were caught on
+  the walk, so the real cost of expanding is the 200 food and the lost minute of
+  production rather than the risk of interception.
+- 43 of the 180 matches ended by eliminating a colony; the rest hit the time
+  limit. That ratio is why the ladder needs margin as well as wins.
+- Figures here are not carried over between versions. The balance fingerprint
+  hashes both `src/sim/config.ts` and the simulation source, so any change to
+  either drops stored matches out of the ladder rather than letting them dilute
+  it. Applying that hash for the first time invalidated all 180 matches at once.
 
 One consequence worth knowing: a strong colony strips its half of the map by
-roughly 700 seconds, and by the 900 second limit every food cluster is gone. Late
-game income is corpses and nothing else, and since a unit returns only 40% of its
-cost when it dies, the whole economy is a net drain by then. That makes the last
-few minutes a genuine attrition phase rather than a second boom, and it is why
-holding a battlefield matters.
+roughly 700 seconds, and in a short match every food cluster is gone well before
+the limit. Late game income is corpses and nothing else. A corpse now returns the
+unit's full cost, so the map is a closed system and the total energy on it never
+changes: the late game is not a net drain, it is a fight over a fixed pool that
+has stopped being replenished by new piles. That makes the last phase attrition
+over old battlefields, which is why holding one matters.
 
 What is still soft: the two rules-based examples sit well above the static
 presets, which is expected (that is the point of rules) but it means the field

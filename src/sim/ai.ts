@@ -39,6 +39,7 @@ import {
 } from './config.js';
 import type { StrategyConfig } from './strategy.js';
 import type { Colony, Nest, Unit, UnitType, Vec } from './types.js';
+import { scoreGuardPost } from './guard-score.js';
 import type { Simulation } from './sim.js';
 
 export function runUnitAi(sim: Simulation, unit: Unit): void {
@@ -820,9 +821,6 @@ function guardPost(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
     // worth taking off them. Capped both ways: uncapped, the best denial score
     // always belongs to the pile touching their nest, and supportability has to
     // win that argument.
-    const denial = Math.max(-GUARD_OWN_HALF_PENALTY_CAP, Math.min(GUARD_DENIAL_CAP, fromUs - fromThem));
-    const exposure = Math.max(0, 60 - fromThem) / 60;
-
     // The strongest signal by far: enemy workers actually working this pile. A
     // guard on a pile nobody wants denies nothing, however valuable the pile.
     let activity = 0;
@@ -830,18 +828,19 @@ function guardPost(sim: Simulation, unit: Unit, strategy: StrategyConfig): Vec {
       if (worker.type === 'worker') activity++;
     }
 
-    const score =
-      1.5 * activity +
-      0.04 * known.estAmount +
-      // Denial is a rate, not a total. A dense pile hands the enemy more energy
-      // per trip, so it is worth more to stand on than a bigger thin one, which
-      // scoring on amount alone got backwards once food types existed.
-      8 * (known.density - 1) +
-      0.5 * denial -
-      0.35 * fromUs -
-      5 * Math.max(0, fromUs - GUARD_MAX_RANGE) -
-      exposure * 60 * (1 - strategy.risk_tolerance);
-    scored.push({ point: { x: known.x, y: known.y }, score, id: known.foodId });
+    // The arithmetic lives in scoreGuardPost, as a function of numbers, so what
+    // it does can be asserted rather than inferred from how a match turned out.
+    const { total } = scoreGuardPost(
+      {
+        amount: known.estAmount,
+        density: known.density,
+        fromOwnNest: fromUs,
+        fromEnemyNest: fromThem,
+        enemyWorkersPresent: activity,
+      },
+      strategy.risk_tolerance,
+    );
+    scored.push({ point: { x: known.x, y: known.y }, score: total, id: known.foodId });
   }
 
   if (scored.length === 0) {

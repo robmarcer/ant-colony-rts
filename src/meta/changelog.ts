@@ -39,6 +39,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.30.0',
+    timestamp: '2026-08-22T11:47:26+07:00',
+    title: 'Caution means one thing, and the fingerprint covers behaviour',
+    precision: 'commit',
+    changes: [
+      { area: 'ai', detail: 'Guard post scoring moved out of the AI into a pure function, src/sim/guard-score.ts, taking five numbers and returning named terms. It was previously inline and read the whole simulation, so the only way to see what it did was to run a match and inspect the aftermath, which is exactly what issue #27 could not resolve.' },
+      { area: 'ai', detail: 'risk_tolerance now gates the denial term as well as the exposure term, which is the bug behind #27. Denial rewarded a pile for being deep in the enemy half and exposure punished it for the same thing, but only exposure was scaled by risk, so the two fought and the crossover sat wherever the arithmetic happened to put it. That is why measuring 150 posts across risk settings found no consistent direction: at 0 caution won, from about 0.5 upward denial won, and nothing in between meant anything. The hypothesis recorded in the issue, that the activity term was swamping caution, was wrong. It takes 33 enemy workers on a pile to outvote maximum caution.', fix: true },
+      { area: 'balance', detail: 'The denial coefficient doubled from 0.5 to 1.0, so risk_tolerance 0.5 reproduces the old ungated weight exactly. Gating at the old coefficient was measured against an ungated control over the same 180 matches and cost preset-blockade three wins, 20-16 down to 17-19, with every other definition unmoved. Halving the default definition\'s reward was a side effect of the correctness fix rather than part of it, so it was scaled out.' },
+      { area: 'sim', detail: 'The balance fingerprint now hashes every source file in src/sim alongside the config exports, and reads as two halves, `<balance>-<simulation>`. Issue #25. Hashing numbers alone gave a wrong answer for real: a change to how workers scouted altered outcomes without touching a constant, every stored match still claimed to be comparable, and the ladder pooled 72 games from two different simulations. Applying it invalidated all 180 stored matches immediately, which is the fingerprint working rather than a problem with it.', fix: true },
+      { area: 'sim', detail: 'A comment-only edit inside src/sim now invalidates stored matches too. That cost is accepted deliberately: losing comparability you still had is an inconvenience, while claiming comparability you lost is a bad measurement presented as a good one.' },
+      { area: 'api', detail: 'A refused replay now names which half of the fingerprint moved, because the two mean different things to whoever reads it. A balance change is a deliberate retune; a simulation change may be a behaviour fix nobody realised would invalidate their measurements.' },
+      { area: 'balance', detail: 'The ladder is unchanged by all of this: 180 fresh matches reproduce v0.29.0 exactly, claude-v1 2340 down to preset-harass 932, with every win-loss record identical. That is the intended result. A correctness fix to what a knob means should not move the field, and the rescaled coefficient is what makes it not.' },
+      { area: 'docs', detail: 'Corrected three stale claims found while editing. The README still said a corpse returns 40% of its cost and the late game is a net drain, but corpses have returned their full cost since the map became a closed system. It also still ranked preset-blockade second at 81%, a figure from before terrain, when v0.29.0 had already measured it fifth. AGENTS.md said only config.ts changes invalidate the store.', fix: true },
+      { area: 'tests', detail: 'Seventeen new checks. Seven assert the guard decision directly rather than observing it: that maximum caution scores an exposed pile below an identical safe one, that no caution reverses that, and that risk_tolerance moves the preference in one direction across twenty steps. Ten cover the fingerprint, including that changing a line of simulation code changes it, that file listing order does not, and that an old single-part hash reports as a mismatch rather than a match.' },
+    ],
+  },
+  {
     version: '0.29.0',
     timestamp: '2026-08-21T23:22:28+07:00',
     title: 'Rocks on the map',
