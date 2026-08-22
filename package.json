@@ -16,6 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "coach": "tsx src/coach/coach.ts",
     "changelog": "tsx src/meta/write-changelog.ts",
+    "releases": "tsx src/meta/cut-releases.ts",
     "ladder": "tsx src/headless/run.ts --ladder"
   },
   "dependencies": {

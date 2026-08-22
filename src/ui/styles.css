@@ -226,6 +226,21 @@ canvas.dragging { cursor: grabbing; }
 .version:hover { color: var(--a); border-bottom-color: var(--a); }
 .version #versionNumber { color: var(--a); font-weight: 700; }
 
+/* Hidden until there is something to report, so the header does not carry a
+   permanent empty slot for news that usually is not there. */
+.update-badge {
+  font: inherit;
+  color: var(--bg);
+  background: var(--a);
+  border: 0;
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-badge:hover { filter: brightness(1.15); }
+.update-badge[hidden] { display: none; }
+
 .entry { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 16px; }
 .entry:first-of-type { border-top: 0; margin-top: 8px; }
 .entry h3 { margin: 0 0 2px; font-size: 14px; color: var(--a); }

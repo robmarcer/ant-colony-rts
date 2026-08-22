@@ -29,8 +29,11 @@ it silently.
 - Add a `src/meta/changelog.ts` entry in the same change, never as a follow up,
   then run `npm run changelog`. Entries marked `commit` take their timestamp from
   `git log`, not from the clock.
-- Any change to `src/sim/config.ts` alters the balance hash, which invalidates
-  every stored match record. That is intended. Re-measure with
+- Any change to `src/sim/config.ts` **or to any file in `src/sim`** alters the
+  balance hash, which invalidates every stored match record. That is intended,
+  and it includes comment-only edits: the alternative is a behaviour change that
+  leaves stale matches claiming to be comparable, which has happened and produced
+  a ladder built from two different simulations. Re-measure with
   `npm run match -- --round-robin --seeds 1,2 --time 900` and update the numbers
   quoted in `README.md` and `docs/behaviour.md`, which are measurements rather
   than claims.

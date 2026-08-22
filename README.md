@@ -383,36 +383,42 @@ in the browser reproduces the server's scores exactly.
 ## Balance
 
 The numbers in `src/sim/config.ts` are placeholders, tuned only enough that
-matches are not degenerate. Current state, measured over a round robin of the
-starter definitions across two seeds (112 matches):
+matches are not degenerate. Every figure below comes from one round robin of the
+ten starter definitions over two seeds with sides swapped, 180 matches, all under
+the same fingerprint:
 
-- Win rates spread from 0% to 100% across ten definitions, on the ladder over 180
-  comparable matches under fog of war.
-- The strongest definition is `claude-v1`, written by a model reading
-  `docs/agent-brief.md` and the ladder, at 2052.
+- Ratings run 2340 down to 932. The strongest is `claude-v1`, written by a model
+  reading `docs/agent-brief.md` and the ladder, at 36-0.
+- Then example-adaptive 1857, preset-boom 1743, example-mass-rush 1675,
+  preset-blockade 1549, preset-balanced 1424, preset-scout 1392, preset-rush
+  1065, preset-turtle 1023, preset-harass 932.
 - The shape is roughly rock paper scissors: expansion beats uncommitted
   aggression, well-timed committed aggression beats greedy expansion, and any
   strategy that never expands is out-produced by one that does.
-- Every strategy above 60% expands. The two one-nest presets sit at 28% and 16%.
-- Area denial is strong: preset-blockade, which does nothing but post soldiers on
-  food, is second at 81%.
-- Fog of war compressed the field: with enemy figures now beliefs that can be
-  blind or stale, reactive strategies lost some of their edge. example-adaptive
-  and example-mass-rush both sit at 1732, preset-boom at 1700, and the spread
-  between second and eighth narrowed to 530 points.
-- Measurements quoted here come from a cleared match store, for the reason in
-  issue #25: the balance fingerprint does not cover simulation behaviour, so a
-  code change can leave stale matches looking comparable.
-- Across 56 matches, 119 nests were founded and 4 queens were intercepted on the
-  walk, so expansion is a strong play whose real cost is the 200 food and the
-  minute of lost production rather than the risk of interception.
+- Expansion is what the ranking tracks most closely. The top two found 3.9 and
+  3.1 nests a match; the bottom two found none at all. Ordering the field by
+  nests founded gets the top four and the bottom three in the right places.
+- Area denial is no longer strong. preset-blockade, which does nothing but post
+  soldiers on food, sits fifth at 55.6%. It was second at 81% before the
+  population ceiling and the terrain landed, and that is what issue #24 is about:
+  the posture's claim did not survive a change in scale.
+- 541 nests were founded across the 180 matches and only 7 queens were caught on
+  the walk, so the real cost of expanding is the 200 food and the lost minute of
+  production rather than the risk of interception.
+- 43 of the 180 matches ended by eliminating a colony; the rest hit the time
+  limit. That ratio is why the ladder needs margin as well as wins.
+- Figures here are not carried over between versions. The balance fingerprint
+  hashes both `src/sim/config.ts` and the simulation source, so any change to
+  either drops stored matches out of the ladder rather than letting them dilute
+  it. Applying that hash for the first time invalidated all 180 matches at once.
 
 One consequence worth knowing: a strong colony strips its half of the map by
-roughly 700 seconds, and by the 900 second limit every food cluster is gone. Late
-game income is corpses and nothing else, and since a unit returns only 40% of its
-cost when it dies, the whole economy is a net drain by then. That makes the last
-few minutes a genuine attrition phase rather than a second boom, and it is why
-holding a battlefield matters.
+roughly 700 seconds, and in a short match every food cluster is gone well before
+the limit. Late game income is corpses and nothing else. A corpse now returns the
+unit's full cost, so the map is a closed system and the total energy on it never
+changes: the late game is not a net drain, it is a fight over a fixed pool that
+has stopped being replenished by new piles. That makes the last phase attrition
+over old battlefields, which is why holding one matters.
 
 What is still soft: the two rules-based examples sit well above the static
 presets, which is expected (that is the point of rules) but it means the field
@@ -462,10 +468,53 @@ Two properties worth knowing, both asserted in the self test:
   makes the ladder a pure function of the match set, so recomputing always gives
   the same answer.
 - **Only comparable matches count.** Ratings pool only matches played under the
-  running balance numbers. A change to a unit cost makes older results a
-  different game, and the ladder reports how many it ignored rather than
-  averaging across them. Definitions are ranked per version, so revising one
-  does not inherit its old rating.
+  running balance numbers *and* the running simulation code. A change to a unit
+  cost, or to how a worker chooses a pile, makes older results a different game,
+  and the ladder reports how many it ignored rather than averaging across them.
+  Definitions are ranked per version, so revising one does not inherit its old
+  rating.
+
+## Staying up to date
+
+The server checks GitHub for a newer release and says so in the header. The check
+is server side, so the unauthenticated rate limit is spent once per process rather
+than once per open tab, and the result is cached for 15 minutes.
+
+```bash
+curl localhost:8787/api/update            # current against latest
+```
+
+The badge only appears when there is something to say. Being up to date, sitting
+ahead of the newest release, or being unable to reach GitHub are all silent, on
+the grounds that a badge which reports good news is a badge nobody reads.
+
+Applying an update is opt in and never automatic, and it warns first rather than
+after:
+
+- **A running match is lost.** Updating restarts the server, and a simulation you
+  are watching that has not been saved cannot be recovered.
+- **Stored matches may stop being ranked.** A new version can change the balance
+  numbers or the simulation code, and either drops your existing matches out of
+  the ladder. They stay on disk and stay readable; they stop being comparable.
+
+Each warning has to be acknowledged by name, so a client that never displayed one
+cannot wave it through with a single flag. `POST /api/update` accepts only
+loopback connections, because applying an update runs `git` and `npm` and on an
+exposed port that is remote code execution.
+
+How it updates depends on how it was installed, and it refuses rather than
+guessing: a git checkout is fetched, checked out, reinstalled and rebuilt in
+place, while a container is told to pull a new image on the host, since a
+container cannot rebuild itself into one. It never restarts itself, because a
+server that vanishes mid-request cannot tell you what it did.
+
+Releases are cut from the changelog, so a release page and the in-app changelog
+cannot disagree about what a version changed:
+
+```bash
+npm run releases              # print what would be published, create nothing
+npm run releases -- --publish # create them
+```
 
 ## Map fairness
 

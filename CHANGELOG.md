@@ -1,10 +1,71 @@
 # Changelog
 
-Current version: **0.29.0**. 29 releases, 195 recorded changes.
+Current version: **0.31.0**. 31 releases, 215 recorded changes.
 
 Generated from `src/meta/changelog.ts` by `npm run changelog`. Edit the data, not this file.
 
 Entries marked *reconstructed* predate version control on this project. Their timestamps were derived from file modification times and the timestamps inside saved match records, so they are accurate to the hour rather than the minute, and there are no commits behind them. Entries marked with a commit hash have exact provenance in git.
+
+## 0.31.0 — The app knows when it is out of date
+
+2026-08-22 18:57 (UTC+07:00) · committed · 11 changes
+
+**API**
+
+- GET /api/update reports the running version against the newest published release, how this copy was installed, and what applying an update would risk. Issue #19. The check is server side and cached for 15 minutes, so the unauthenticated GitHub limit of 60 an hour is spent once per process rather than once per open tab; a few tabs polling directly would have exhausted it.
+- POST /api/update applies one, and refuses in four distinct ways rather than half-applying: nothing published to update to, this build is not behind, a warning has not been acknowledged, or this install cannot be updated in place. A failed step stops the sequence and says how to recover, so a failure leaves a checkout that is behind rather than one that is half moved.
+- POST /api/update accepts loopback connections only. Applying an update runs git and npm, so on an exposed port it is remote code execution. The app is meant to be local, but that is an intention rather than a control, and someone will eventually put it behind a tunnel to show a colleague. Verified by calling it over the machine's LAN address and getting 403 while the read-only check still answered 200.
+- Warnings are acknowledged by id, not by one blanket flag, so a warning added in a later version cannot be waved through by an older client that never displayed it.
+- Fix: An async-aware route wrapper. Passing an async function to the existing one type checked cleanly and then dropped every rejection, so a failed update check would have surfaced as an unhandled rejection instead of a JSON error.
+
+**Viewer**
+
+- A header badge naming the new version, which stays hidden unless there is something to say. Up to date, ahead of the newest release, and unable to reach GitHub are all silent: a badge that reports good news as well as bad is a badge nobody reads, and then the once it matters it is invisible. Clicking it opens a panel stating what changed and both risks before it offers the button.
+- The browser passes whether a match is running, because only it knows. The server cannot see what is on screen, and updating throws away an unsaved simulation.
+
+**Tests**
+
+- Forty-one checks over version arithmetic, the standing states, the warnings, the update plans and the badge. Numeric rather than text comparison is pinned explicitly, because string ordering puts 0.9.0 after 0.10.0. Not covered: the apply path's stop-on-failure behaviour end to end, which needs a real failing checkout to run and was not exercised.
+
+**Docs**
+
+- Fix: The README documented the ladder as pooling matches by balance numbers alone. It has hashed the simulation source since 0.30.0.
+
+**Tooling**
+
+- npm run releases publishes a GitHub release per version tag with notes generated from the changelog. It is a dry run by default and needs --publish to create anything, because publishing is public and not quietly undoable. It cuts oldest first, so the releases API points /latest at the newest version rather than at whichever was created last.
+- Release notes and CHANGELOG.md now render from one shared module. Notes written separately would drift from the changelog the app serves for the same version, and then the update prompt and the release page would disagree about what changed. The refactor was checked by regenerating CHANGELOG.md and diffing it byte for byte.
+
+## 0.30.0 — Caution means one thing, and the fingerprint covers behaviour
+
+2026-08-22 11:47 (UTC+07:00) · committed · 9 changes
+
+**Simulation**
+
+- Fix: The balance fingerprint now hashes every source file in src/sim alongside the config exports, and reads as two halves, `<balance>-<simulation>`. Issue #25. Hashing numbers alone gave a wrong answer for real: a change to how workers scouted altered outcomes without touching a constant, every stored match still claimed to be comparable, and the ladder pooled 72 games from two different simulations. Applying it invalidated all 180 stored matches immediately, which is the fingerprint working rather than a problem with it.
+- A comment-only edit inside src/sim now invalidates stored matches too. That cost is accepted deliberately: losing comparability you still had is an inconvenience, while claiming comparability you lost is a bad measurement presented as a good one.
+
+**Unit AI**
+
+- Guard post scoring moved out of the AI into a pure function, src/sim/guard-score.ts, taking five numbers and returning named terms. It was previously inline and read the whole simulation, so the only way to see what it did was to run a match and inspect the aftermath, which is exactly what issue #27 could not resolve.
+- Fix: risk_tolerance now gates the denial term as well as the exposure term, which is the bug behind #27. Denial rewarded a pile for being deep in the enemy half and exposure punished it for the same thing, but only exposure was scaled by risk, so the two fought and the crossover sat wherever the arithmetic happened to put it. That is why measuring 150 posts across risk settings found no consistent direction: at 0 caution won, from about 0.5 upward denial won, and nothing in between meant anything. The hypothesis recorded in the issue, that the activity term was swamping caution, was wrong. It takes 33 enemy workers on a pile to outvote maximum caution.
+
+**Balance**
+
+- The denial coefficient doubled from 0.5 to 1.0, so risk_tolerance 0.5 reproduces the old ungated weight exactly. Gating at the old coefficient was measured against an ungated control over the same 180 matches and cost preset-blockade three wins, 20-16 down to 17-19, with every other definition unmoved. Halving the default definition's reward was a side effect of the correctness fix rather than part of it, so it was scaled out.
+- The ladder is unchanged by all of this: 180 fresh matches reproduce v0.29.0 exactly, claude-v1 2340 down to preset-harass 932, with every win-loss record identical. That is the intended result. A correctness fix to what a knob means should not move the field, and the rescaled coefficient is what makes it not.
+
+**API**
+
+- A refused replay now names which half of the fingerprint moved, because the two mean different things to whoever reads it. A balance change is a deliberate retune; a simulation change may be a behaviour fix nobody realised would invalidate their measurements.
+
+**Tests**
+
+- Seventeen new checks. Seven assert the guard decision directly rather than observing it: that maximum caution scores an exposed pile below an identical safe one, that no caution reverses that, and that risk_tolerance moves the preference in one direction across twenty steps. Ten cover the fingerprint, including that changing a line of simulation code changes it, that file listing order does not, and that an old single-part hash reports as a mismatch rather than a match.
+
+**Docs**
+
+- Fix: Corrected three stale claims found while editing. The README still said a corpse returns 40% of its cost and the late game is a net drain, but corpses have returned their full cost since the map became a closed system. It also still ranked preset-blockade second at 81%, a figure from before terrain, when v0.29.0 had already measured it fifth. AGENTS.md said only config.ts changes invalidate the store.
 
 ## 0.29.0 — Rocks on the map
 

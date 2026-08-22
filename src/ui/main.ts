@@ -11,6 +11,13 @@ import type { ColonyId, MatchEvent } from '../sim/types.js';
 import type { StrategyConfig } from '../sim/strategy.js';
 import { Renderer } from './renderer.js';
 import { APP_VERSION } from '../meta/changelog.js';
+import {
+  POLL_MINUTES,
+  acknowledgements,
+  badgeLabel,
+  updatePanelHtml,
+  type UpdateStatusResponse,
+} from './update-badge.js';
 import { changelogHtml } from './changelog-view.js';
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -408,6 +415,68 @@ el<HTMLAnchorElement>('changelogLink').onclick = (event) => {
   event.preventDefault();
   openPanel('Changelog', changelogHtml());
 };
+
+/*
+ * The update check. Polled rather than checked once, because the viewer is left
+ * open for hours and a release cut mid-session would otherwise go unnoticed until
+ * a reload. `matchRunning` is passed so the server can warn that updating throws
+ * away the simulation on screen; only the browser knows that.
+ */
+const updateBadge = el<HTMLButtonElement>('updateBadge');
+let updateStatus: UpdateStatusResponse | null = null;
+
+async function checkForUpdate(): Promise<void> {
+  try {
+    const response = await fetch(`/api/update?matchRunning=${playing ? 'true' : 'false'}`);
+    if (!response.ok) return;
+    updateStatus = (await response.json()) as UpdateStatusResponse;
+    const label = badgeLabel(updateStatus);
+    updateBadge.hidden = label === null;
+    if (label !== null) updateBadge.textContent = label;
+  } catch {
+    // A failed check is silent. The app works offline, and an error badge for a
+    // background poll nobody asked for is noise.
+  }
+}
+
+updateBadge.onclick = () => {
+  if (!updateStatus) return;
+  openPanel(`Update to ${updateStatus.latest}`, updatePanelHtml(updateStatus, escape));
+  const apply = document.getElementById('updateApply');
+  if (!apply) return;
+  apply.addEventListener('click', () => {
+    void applyUpdate();
+  });
+};
+
+async function applyUpdate(): Promise<void> {
+  if (!updateStatus) return;
+  const outcome = document.getElementById('updateOutcome');
+  const button = document.getElementById('updateApply') as HTMLButtonElement | null;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Updating...';
+  }
+  if (outcome) outcome.textContent = 'Fetching, installing and rebuilding. This takes a minute or two.';
+  try {
+    const response = await fetch('/api/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ acknowledge: acknowledgements(updateStatus), matchRunning: playing }),
+    });
+    const body = (await response.json()) as { message?: string; error?: string; instructions?: string };
+    if (outcome) outcome.textContent = body.message ?? body.instructions ?? body.error ?? 'no response';
+  } catch (error) {
+    if (outcome) outcome.textContent = `the update request failed: ${(error as Error).message}`;
+  }
+  if (button) {
+    button.disabled = false;
+    button.textContent = 'Update now';
+  }
+}
+
+void checkForUpdate();
+setInterval(() => void checkForUpdate(), POLL_MINUTES * 60_000);
 
 el<HTMLAnchorElement>('instructionsLink').onclick = (event) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey) return;

@@ -117,8 +117,10 @@ A rule naming a metric that does not exist is silently dropped from the match.
 5. `expansion_priority`. How idle workers choose food: `nearest_food_first`,
    `largest_food_first`, `scout_aggressively`, `contest_enemy_food`.
 6. `risk_tolerance` (0-1). Retreat threshold, whether soldiers engage when
-   locally outnumbered, how close to the enemy you will settle a nest, and how
-   far into their half workers will forage.
+   locally outnumbered, how close to the enemy you will settle a nest, how far
+   into their half workers will forage, and how deep guards will stand: at 0 a
+   guard will not take a post near a known enemy nest even when the pile there
+   is the one hurting you most, and at 1 it prefers exactly those posts.
 7. `min_worker_reserve`. A hard floor: build only workers until you have this
    many. Also the floor recycling will not cull below.
 8. `recycle_surplus` (0-1). Send surplus units home to be eaten by a queen,

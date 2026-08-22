@@ -5,7 +5,7 @@ import type { BehaviourDefinition, ValidationIssue } from '../sim/definition.js'
 import type { ColonyId } from '../sim/types.js';
 import { describeStrategy } from '../sim/rules.js';
 import { APP_VERSION } from '../meta/changelog.js';
-import { balanceFingerprint } from '../meta/fingerprint.js';
+import { balanceFingerprint, fingerprintDrift } from '../meta/fingerprint.js';
 import type { Battlefield, ColonyStats, MatchRecord, RuleActivity } from './types.js';
 
 export interface RunMatchOptions {
@@ -114,7 +114,15 @@ export function replayRecord(record: MatchRecord): { identical: boolean; replaye
     const parts: string[] = [];
     if (record.appVersion !== APP_VERSION) parts.push(`recorded under app ${record.appVersion}, running ${APP_VERSION}`);
     if (record.balanceHash !== balanceFingerprint()) {
-      parts.push(`balance numbers differ (recorded ${record.balanceHash}, running ${balanceFingerprint()})`);
+      // Naming the half that moved matters, because the two mean different
+      // things to whoever is reading: a balance change is a deliberate retune,
+      // whereas a simulation change may be a behaviour fix nobody realised
+      // would invalidate their measurements.
+      const drift = fingerprintDrift(record.balanceHash);
+      const moved = [drift.balance ? 'balance numbers' : null, drift.simulation ? 'simulation code' : null]
+        .filter(Boolean)
+        .join(' and ');
+      parts.push(`${moved} differ (recorded ${record.balanceHash}, running ${balanceFingerprint()})`);
     }
     throw new NotReplayable(
       record.appVersion,
