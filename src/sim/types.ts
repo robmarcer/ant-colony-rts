@@ -52,8 +52,23 @@ export interface Unit {
   foundingSite: Vec | null;
   /** Queens only. The nest this queen sits in, once settled. */
   nestId: number | null;
-  /** Queens only. Her own build slot; every queen produces independently. */
-  build: BuildJob | null;
+  /**
+   * Queens only. Every queen produces independently, and raises up to
+   * `broodSlots` units at once. One entry per unit actually in progress, so an
+   * idle queen holds an empty array rather than a list of nulls.
+   */
+  builds: BuildJob[];
+  /** Queens only. How many units this nest can raise at once. Bought, see #31. */
+  broodSlots: number;
+  /**
+   * Queens only. Food sunk into brood slots at this nest.
+   *
+   * Tracked because the map is a closed system: energy spent on capacity has to
+   * still be somewhere, or buying a slot would quietly destroy food. It counts
+   * toward totalEnergy() and is returned as a corpse when the queen dies, which
+   * makes a heavily invested nest worth killing.
+   */
+  broodInvestment: number;
   /**
    * Soldiers on guard_food duty: the pile this one is posted to. Sticky, because
    * choosing the post fresh every tick made guards chase whichever pile happened
@@ -181,6 +196,8 @@ export interface Colony {
   /** Tick of the most recent enemy sighting, for intel age. */
   lastSightingTick: number;
   unitsProduced: Record<UnitType, number>;
+  /** Brood slots bought across all this colony's nests, for the match record. */
+  broodSlotsBought: number;
   nestsFounded: number;
   /** Own units consumed by a queen to change the army's composition. */
   unitsRecycled: Record<UnitType, number>;
@@ -203,6 +220,7 @@ export type MatchEventType =
   | 'nest_founded'
   | 'nest_lost'
   | 'queen_walking'
+  | 'brood_slot_bought'
   | 'food_depleted'
   | 'strategy_change'
   | 'rule_activated'

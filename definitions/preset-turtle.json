@@ -16,10 +16,11 @@
     "risk_tolerance": 0.15,
     "target_nests": 1,
     "recycle_surplus": 0,
+    "capacity_investment": 0.6,
     "expansion_bias": "toward_safety",
     "relocate_food": 0,
     "scout_ratio": 0.08
   },
   "rules": [],
-  "updatedAt": "2026-08-20T12:33:09.780Z"
+  "updatedAt": "2026-08-22T18:05:26.962Z"
 }

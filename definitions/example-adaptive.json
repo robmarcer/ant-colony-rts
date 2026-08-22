@@ -16,6 +16,7 @@
     "risk_tolerance": 0.3,
     "target_nests": 2,
     "recycle_surplus": 0,
+    "capacity_investment": 0.5,
     "expansion_bias": "toward_food",
     "relocate_food": 0,
     "scout_ratio": 0.12
@@ -154,5 +155,5 @@
       }
     }
   ],
-  "updatedAt": "2026-08-20T12:33:09.784Z"
+  "updatedAt": "2026-08-22T18:05:26.965Z"
 }

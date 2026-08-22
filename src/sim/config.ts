@@ -159,6 +159,26 @@ export const MAX_NESTS_PER_COLONY = 6;
  * slot and the shorter haul, rather than because of a headcount.
  */
 export const UNITS_PER_NEST = 100;
+/*
+ * Brood slots: how many units a nest can raise at once.
+ *
+ * Issue #31. A queen used to hold a single build slot, and because a worker is
+ * 10 food over 4 seconds and a soldier 30 over 12, both work out at 2.5 food a
+ * second. A colony's whole spend rate was therefore 2.5 times its queen count
+ * while income scales with worker count, which runs into the hundreds. Measured
+ * over 180 matches, 47% of all food gathered was never spent by anybody, and
+ * every definition earned between 1.3 and 2.3 times faster than it could spend.
+ *
+ * Slots are bought rather than granted, so a stockpile is a decision instead of
+ * a number that only goes up: units now, or a bigger army every minute after.
+ */
+export const BROOD_SLOTS_INITIAL = 1;
+export const BROOD_SLOTS_MAX = 6;
+/** First extra slot. Priced against a queen at 200 so expanding stays competitive. */
+export const BROOD_SLOT_BASE_COST = 120;
+/** Each slot costs this much more than the last, so capacity cannot run away. */
+export const BROOD_SLOT_COST_GROWTH = 1.7;
+
 /**
  * Recycling only happens under population pressure, at or above this fraction of
  * the ceiling.

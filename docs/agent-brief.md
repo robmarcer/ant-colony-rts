@@ -63,7 +63,8 @@ Eight knobs and an ordered list of rules. Nothing else.
     "soldier_posture": "defend_nest",
     "risk_tolerance": 0.5,
     "target_nests": 3,
-    "recycle_surplus": 0
+    "recycle_surplus": 0,
+    "capacity_investment": 0.5
   },
   "rules": [
     {
@@ -125,12 +126,20 @@ A rule naming a metric that does not exist is silently dropped from the match.
    many. Also the floor recycling will not cull below.
 8. `recycle_surplus` (0-1). Send surplus units home to be eaten by a queen,
    returning their full cost. Only works at 90%+ of your population ceiling.
-9. `relocate_food` (0-1). Ferry a distant or contested pile closer to home
+9. `capacity_investment` (0-1). Spend surplus food raising a nest's brood
+   capacity rather than on units now. A nest raises one unit at a time to start
+   with, and both unit types work out at 2.5 food a second, so that is your whole
+   spend rate per queen however much you gather. Extra slots cost 120, 204, 347,
+   590 and 1003, to a maximum of six. 0 never buys, 1 buys as soon as affordable,
+   0.5 waits until the stockpile is three times the price. Expansion outranks it:
+   a queen you can afford is always built first, because a nest brings a brood
+   chamber of its own and raises the population ceiling too.
+10. `relocate_food` (0-1). Ferry a distant or contested pile closer to home
    instead of banking it. Never more efficient than hauling, since the worker
    makes the same trip and the food still needs collecting; it buys risk, on
    piles the enemy is better placed to take than you are. Pairs with
    `contest_enemy_food`.
-10. `scout_ratio` (0-1). Fraction of idle workers exploring rather than hauling,
+11. `scout_ratio` (0-1). Fraction of idle workers exploring rather than hauling,
     and how much of that effort probes toward the enemy rather than sweeping for
     food. This is how you buy information, and it is paid for in food.
 11. `expansion_bias`. Which way a new queen leans when choosing between sites:

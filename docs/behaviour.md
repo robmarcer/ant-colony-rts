@@ -265,6 +265,46 @@ rather than a deposit by another name.
 Pairs naturally with `contest_enemy_food`, which is what sends workers to that
 kind of pile in the first place.
 
+### capacity_investment
+
+How readily surplus food is spent on brood slots instead of on units right now.
+
+A nest raises one unit at a time to begin with. Because a worker is 10 food over
+4 seconds and a soldier 30 over 12, both come to 2.5 food a second, so a colony's
+entire spend rate is 2.5 times its queen count no matter how fast it gathers.
+Measured over 180 matches before this existed, **47% of all food gathered was
+never spent by anybody**, and every definition earned between 1.3 and 2.3 times
+faster than it could possibly spend. Food stopped being a constraint early and
+never became one again, which is why no definition ever used `food_stockpile` in
+a rule: a number that only goes up carries no information.
+
+Each extra slot lifts that ceiling permanently. They cost 120, 204, 347, 590 and
+1003 food, to a maximum of six per nest, so capacity cannot simply be bought out.
+
+- 0 never buys one, which is a genuine off rather than a slow yes. That matters
+  for measurement: it gives a control that is unchanged rather than delayed.
+- 1 buys the moment a slot is affordable.
+- 0.5 waits until the stockpile is three times the price.
+
+Three conditions:
+
+- **Expansion outranks it.** A queen the colony can afford is always built first.
+  A nest is worth more than a slot for the same food, because it arrives with a
+  brood chamber of its own, raises the population ceiling, and adds its own 2.5
+  food a second. Ordering these the other way round was tried and was clearly
+  wrong: a colony saving for a 200 food queen bought a 120 food slot first every
+  time, so expansion queued behind all 2,264 food of slots and preset-boom
+  stopped reaching a second nest inside 300 seconds.
+- **Never below `min_worker_reserve`.** That floor exists so a colony cannot
+  starve its own economy, and capacity it has no workers to feed is the same
+  mistake somewhere new.
+- **Always at the population ceiling**, whatever the knob says, because there is
+  nothing else left to buy and the alternative is the hoarding this fixes.
+
+Food sunk into a brood chamber is not gone. It counts toward the map's total
+energy and comes back as a corpse when the queen dies, so the closed system stays
+closed and a heavily invested nest is worth killing for.
+
 ### recycle_surplus
 
 Sends surplus units home to be eaten by a queen. Their full food cost, plus
